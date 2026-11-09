@@ -2,13 +2,15 @@
 
 > 2026-11-09, 첫 번째 앱 "안 써본 기능"을 만든 세션이 썼다.
 >
-> 이 폴더(`app-2`)는 독립된 git 저장소다. GitHub는 `tapetapetap/app-2`(비공개)다.
+> 이 폴더(`/Users/jiwon/orca/workspaces/unused-feature-app/app-2`)는 Orca가 만든 워크트리다.
+> - 첫 번째 앱 저장소(`unused-feature-app`)를 함께 쓰지만, 브랜치 `app-2`는 첫 앱과 기록을 공유하지 않는 별도 브랜치다.
+> - `git push`는 GitHub `tapetapetap/app-2`(비공개)의 `main`으로 가도록 설정되어 있다(원격 `app2`). `origin`(첫 앱 저장소)으로는 푸시하지 않는다.
 >
-> 첫 번째 앱은 옆 폴더 `../unused-feature-app`에서 다른 세션이 계속 작업한다. GitHub는 `tapetapetap/unused-feature-app`(비공개)다. 그 폴더는 **읽기만** 하고 고치지 않는다.
+> 첫 번째 앱은 `/Users/jiwon/Desktop/현대자동차 공모전/unused-feature-app`(브랜치 `main`)에서 다른 세션이 계속 작업한다. GitHub는 `tapetapetap/unused-feature-app`(비공개)다. 그 폴더는 **읽기만** 하고 고치지 않는다.
 >
 > 커밋과 푸시는 사용자가 요청할 때만 한다.
 >
-> 아래에서 `../`는 상위 폴더 `/Users/jiwon/Desktop/현대자동차 공모전`을 가리킨다.
+> 아래에서 `../`는 이 폴더의 부모가 아니라 공모전 폴더 `/Users/jiwon/Desktop/현대자동차 공모전`을 가리킨다.
 
 ## 0. 먼저 할 일
 
