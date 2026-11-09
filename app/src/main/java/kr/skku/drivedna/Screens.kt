@@ -1,5 +1,6 @@
 package kr.skku.drivedna
 
+import android.content.res.Configuration
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
@@ -73,7 +74,7 @@ fun Ui.result(m: Metrics, axes: List<Axis>, diff: String?, title: String, top: V
 
 /** 짧은 운전. 기준 숫자는 [l]에서(시연용 빌드는 30초·0.2km) */
 fun Ui.short(m: Metrics, l: Limits): View = column(28,
-    small("방금 끝난 운전 · ${elapsed(m.durationMs)}"),
+    small("${driveTitle(m.endedAt)} · ${elapsed(m.durationMs)}"),
     hero(tile(R.drawable.ic_clock, Tile.GREY), "짧은 운전은\n분석하지 않아요",
         "${elapsed(l.minDriveMs)}, ${l.minDriveKm.toString().removeSuffix(".0")}km 넘게 달리면 이번 운전 DNA를 보여 드려요."),
 )
@@ -134,5 +135,9 @@ fun Ui.profile(p: Profile, driving: Boolean, onHistory: () -> Unit, onTypes: () 
         chip("운전 기록  ›", R.color.blue, R.color.blue_soft, R.drawable.ic_list).apply { setOnClickListener { onHistory() } },
         chip("16유형  ›", R.color.blue, R.color.blue_soft, R.drawable.ic_grid).apply { setOnClickListener { onTypes() } },
     ).onEach { it.isEnabled = !driving; it.alpha = if (driving) 0.4f else 1f } // 비활성 뷰는 덤프에 enabled="false"
-    return column(24, *listOfNotNull(head, type).toTypedArray(), *bars.toTypedArray(), row(12, *chips.toTypedArray()))
+    val buttons = row(12, *chips.toTypedArray())
+    // 세로 화면의 아래 칸은 낮아서, 버튼을 맨 아래에 두면 스크롤해야 보인다. 그때는 머리 바로 밑에 둔다
+    if (ctx.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT)
+        return column(24, head, buttons, *listOfNotNull(type).toTypedArray(), *bars.toTypedArray())
+    return column(24, *listOfNotNull(head, type).toTypedArray(), *bars.toTypedArray(), buttons)
 }

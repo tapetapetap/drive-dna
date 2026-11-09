@@ -27,6 +27,10 @@ fun dayLabel(ms: Long): String {
     return SimpleDateFormat(if (year(ms) == year(System.currentTimeMillis())) "M월 d일" else "yyyy년 M월 d일", Locale.KOREA).format(Date(ms))
 }
 
+/** 결과 제목 앞부분: 10분 안에 끝난 운전은 "방금 끝난 운전", 그 밖은 "{날짜} {시각} 운전"(앱을 나중에 다시 열었을 때) */
+fun driveTitle(endedAt: Long, now: Long = System.currentTimeMillis()) =
+    if (now - endedAt < 10 * 60_000) "방금 끝난 운전" else "${dayLabel(endedAt)} ${timeOfDay(endedAt)} 운전"
+
 /** 1분 미만은 초로: "40초", 그 밖은 "3분"(내림) */
 fun elapsed(ms: Long) = if (ms < 60_000) "${ms / 1000}초" else "${ms / 60_000}분"
 

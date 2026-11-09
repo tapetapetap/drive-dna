@@ -128,7 +128,7 @@ class MainActivity : Activity() {
         shownCode = Types.code(axes.map { it.value })
         val diff = Profile.difference(axes, Profile.of(analyzed.drop(i + 1), limits))
         val length = "${elapsed(m.durationMs)} · ${m.km.km1()}km"
-        if (openRecord == null) return ui.result(m, axes, diff, "방금 끝난 운전 · $length")
+        if (openRecord == null) return ui.result(m, axes, diff, "${driveTitle(m.endedAt)} · $length")
         val back = ui.chip("←  운전 기록", R.color.text2, R.color.chip).apply { setOnClickListener { openRecord = null; render() } }
         return ui.result(m, axes, diff, "${dayLabel(m.endedAt)} ${timeOfDay(m.endedAt)} 운전 · $length", ui.row(0, back))
     }

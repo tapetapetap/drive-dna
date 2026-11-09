@@ -280,6 +280,13 @@ class TypesProfileCoachTest {
         assertTrue(Coach.line(calm.copy(early = 1)).startsWith("큰 회전 5번 중 4번은"))
     }
 
+    @Test fun titleSaysJustNowOnlyForRecentDrives() {
+        val now = 1_794_000_000_000
+        assertEquals("방금 끝난 운전", driveTitle(now - 5 * MINUTE, now))
+        assertTrue(driveTitle(now - 60 * MINUTE, now).endsWith(" 운전"))
+        assertFalse(driveTitle(now - 60 * MINUTE, now).startsWith("방금"))
+    }
+
     @Test fun recordsRoundTrip() {
         val a = m(0.2, 12.0).copy(endedAt = 1_794_000_000_000)
         val b = Metrics(endedAt = 5, durationMs = 15_000, km = 0.08) // 신호 없음·짧은 운전

@@ -87,7 +87,10 @@ class WatchService : Service() {
         var changed = noSignal // 신호가 온다 = 연결됨
         noSignal = false
         val t = watcher.tracker
-        if (driving != t.notParked || recording != t.driving) { driving = t.notParked; recording = t.driving; changed = true }
+        if (driving != t.notParked || recording != t.driving) {
+            driving = t.notParked; recording = t.driving; changed = true
+            if (driving) getSystemService(NotificationManager::class.java).cancel(ID_RESULT) // "이번 운전" 알림이 지난 운전을 가리키지 않게
+        }
         if (changed) onUpdate?.invoke()
     }
 
