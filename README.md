@@ -1,0 +1,75 @@
+# DRIVE DNA
+
+운전을 마치고 P에 놓으면, 이번 운전의 성향을 네 글자 유형(예: GPSE 차분한 계획가)으로 보여 주는 Pleos Connect 앱입니다. 차 신호(주행거리, 브레이크, 조향각, 방향지시등, 배터리 잔량)만으로 네 개 축을 판정하고, 축마다 무엇을 보고 그렇게 판단했는지 관측 사실을 먼저 보여 줍니다. 근거가 모자란 축은 억지로 정하지 않고 "·"로 보류합니다. 운전이 쌓이면 최근 10번을 모은 "나의 DNA"와 이번 운전이 평소와 어떻게 달랐는지를 보여 줍니다.
+
+![이번 운전 DNA](docs/screenshots/03-result-gentle.png)
+
+## 네 개 축 (잠정 기준)
+
+| 축 | 앞 / 뒤 | 보는 것 |
+|---|---|---|
+| 역동성 | G 부드러움 / D 역동적 | 10km당 급가속·급감속·빠른 조향 횟수(속도는 주행거리로 추정) |
+| 대응 방식 | P 예측형 / R 반응형 | 큰 회전 전에 방향지시등을 1.5초 이상 미리 켠 비율 |
+| 주행 리듬 | S 안정형 / F 유동형 | 움직이는 동안 속도의 변동계수 |
+| 운전 목적 | E 효율 / C 편안함 | 100km당 전력(배터리 잔량 감소) |
+
+기준 수치는 검증 전 잠정값이고, 화면에도 "잠정 기준"이라고 적습니다. 결과는 정차(P)에서만 보여 주고, 주행 중에는 말하지도 화면을 바꾸지도 않습니다. 기록은 차 안에만 100개까지 남고 위치는 모으지 않습니다.
+
+## 실행 방법
+
+### 빌드
+
+```bash
+export JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home)
+export ANDROID_HOME=$HOME/Library/Android/sdk
+./gradlew :app:testDebugUnitTest :app:assembleDebug
+```
+
+**APK 위치**: 빌드하면 `app/build/outputs/apk/debug/app-debug.apk`가 생깁니다.
+
+### 에뮬레이터에서 시연
+
+```bash
+emulator -avd pleos -no-snapshot &      # Cold boot. Quick boot면 VHAL을 못 씀
+adb install -r -g app/build/outputs/apk/debug/app-debug.apk
+adb forward tcp:8088 tcp:8088           # Virtual Console
+python3 scripts/demo.py reset           # 첫 앱 정지, 콘솔 신호 0, 배터리 60kWh, 앱 기록 삭제 후 앱 열기
+python3 scripts/demo.py gentle          # 부드러운 운전(약 2분 15초) → GPSE 차분한 계획가
+python3 scripts/demo.py dynamic         # 역동적인 운전(약 1분) → DRFC 자유로운 드라이버
+python3 scripts/demo.py city            # 시내 운전(약 2분 10초) → GPFE 유연한 길잡이
+python3 scripts/demo.py straight        # 회전 없는 운전(약 2분) → G·SE, 대응 방식 판정 보류
+python3 scripts/demo.py short           # 15초 운전 → "짧은 운전은 분석하지 않아요"
+```
+
+- Virtual Console은 속도를 줘도 주행거리를 늘리지 않습니다. 그래서 스크립트가 0.2초마다 경과 시간으로 계산한 주행거리를 직접 씁니다. 시나리오는 `scripts/scenarios/<이름>.txt`의 구간표이고, 단위 테스트(`DnaTest`)도 같은 표를 재생해 기대 유형을 지킵니다.
+- 기어를 D에 두면 Pleos가 "주행 중에는 사용할 수 없습니다"로 앱을 가립니다. P에 놓는 순간 결과 화면과 음성 한 번이 나옵니다.
+- 브라우저로 `127.0.0.1:8088` 콘솔 페이지를 열어 둔 채 스크립트를 돌리면, 페이지에 남은 상태가 다시 들어갑니다. 스크립트로 시연할 때는 페이지를 닫으세요.
+- 정차 중에는 왼쪽 "나의 DNA" 칸의 **운전 기록 ›**(지난 운전 다시 보기)과 **16유형 ›**(유형 표)을 누를 수 있습니다.
+
+## 테스트 환경과 설정
+
+- Pleos Connect Emulator v2.1.0(Android API 34), 가로 2560×1440(앱 창 1682×1210)
+- Pleos Vehicle SDK 2.3.2, Pleos TextToSpeech 3.3.1(온디바이스)
+- 권한: `pleos.car.permission.CAR_INFO`·`CAR_DRIVE`·`CAR_LIGHTS`·`CAR_ENERGY`(조회만), `TTS_SERVICE`, 알림
+- JDK 17, Gradle 8.11.1, AGP 8.8.2, Kotlin 2.0.21, 시연 스크립트는 Python 3(표준 라이브러리만)
+- 디버그 빌드는 보류·짧은 운전 기준을 낮춥니다(30초·0.2km, 축 판정 0.3km·회전 2번). 출시 빌드는 3분·1km, 축 판정 2km·회전 3번입니다. 시계는 둘 다 실제 시간입니다.
+
+## 문서
+
+- 기획: `../DRIVE_DNA_자동차_운전성향_보고서.pdf`(공모전 폴더)
+- 설계: `docs/superpowers/specs/2026-11-09-drive-dna-design.md`
+- 명세·계획·작업·검증: `specs/001-drive-dna/`
+  - `spec.md`, `plan.md`, `data-model.md`, `contracts/ui.md`, `research.md`(신호 측정), `quickstart.md`, `tasks.md`
+  - `goldfish-review.md`(설계 문서 리뷰), `approval-gate.md`(구현 전 결정), `verification.md`(에뮬레이터 결과)
+- 화면 캡처: `docs/screenshots/`(첫 실행, 주행 중, 결과, 기록, 다시 보기, 16유형, 보류, 짧은 운전, 다크, 세로)
+
+## 한계
+
+- **속도는 추정입니다.** SDK에 차속 신호가 없어 주행거리 변화로 계산합니다. SDK는 주행거리를 Float로 주므로 누적 32,768km 이상인 차는 값의 최소 단위가 3.9m를 넘어, 그 운전의 역동성·주행 리듬을 "주행거리 값이 거칠어 판정을 미뤘어요"로 보류합니다. 실차에서 주행거리가 더 거친 단위(예: 0.1km)로 오면 급가속·급감속을 놓칠 수 있습니다. 에뮬레이터 밖에서는 확인하지 못했습니다.
+- 서 있거나 후진하며 돌린 핸들(주차)은 회전으로 세지 않습니다.
+- **대응 방식은 방향지시등 습관만 봅니다.** 주변 차·차선 정보가 없어 예측 능력을 판정하지 않습니다.
+- **운전 목적은 전기차의 배터리 잔량만 봅니다.** 배터리 신호가 없는 차에서는 이 축이 보류됩니다. 도로·기온·속도의 영향이 큽니다.
+- 크루즈 상태와 전비 신호는 에뮬레이터에서 확인되지 않아 쓰지 않습니다.
+- 운전자를 구분하지 않고 한 사람으로 봅니다.
+- 앱이 운전 도중에 처음 켜지면 그 운전은 기록하지 않습니다.
+- 상시 포그라운드 서비스(`specialUse`)가 Pleos App Market 심사에서 허용되는지 확인하지 못했습니다.

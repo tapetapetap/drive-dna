@@ -2,9 +2,12 @@
 
 > 2026-11-09, 첫 번째 앱 "안 써본 기능"을 만든 세션이 썼다.
 >
-> 이 폴더(`/Users/jiwon/orca/workspaces/unused-feature-app/app-2`)는 Orca가 만든 워크트리다.
-> - 첫 번째 앱 저장소(`unused-feature-app`)를 함께 쓰지만, 브랜치 `app-2`는 첫 앱과 기록을 공유하지 않는 별도 브랜치다.
-> - `git push`는 GitHub `tapetapetap/app-2`(비공개)의 `main`으로 가도록 설정되어 있다(원격 `app2`). `origin`(첫 앱 저장소)으로는 푸시하지 않는다.
+> 2026-11-09 이후: 두 번째 앱은 **DRIVE DNA**로 정해졌고 이름을 바꿨다. 이 문서의 `app-2`는 아래로 읽는다.
+>
+> 이 폴더(`/Users/jiwon/orca/workspaces/unused-feature-app/drive-dna`)는 Orca가 만든 워크트리다.
+> - 첫 번째 앱 저장소(`unused-feature-app`)를 함께 쓰지만, 브랜치 `drive-dna`는 첫 앱과 기록을 공유하지 않는 별도 브랜치다.
+> - `git push`는 GitHub `tapetapetap/drive-dna`(비공개)의 `main`으로 가도록 설정되어 있다(원격 `drivedna`). `origin`(첫 앱 저장소)으로는 푸시하지 않는다.
+> - 앱 설명과 실행 방법은 `README.md`, 설계·검증 기록은 `specs/001-drive-dna/`다.
 >
 > 첫 번째 앱은 `/Users/jiwon/Desktop/현대자동차 공모전/unused-feature-app`(브랜치 `main`)에서 다른 세션이 계속 작업한다. GitHub는 `tapetapetap/unused-feature-app`(비공개)다. 그 폴더는 **읽기만** 하고 고치지 않는다.
 >

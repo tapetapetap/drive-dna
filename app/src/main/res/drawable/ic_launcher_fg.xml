@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 앱 아이콘 앞면: 흰 이중 나선(ic_dna를 크게) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:translateX="27.6" android:translateY="27.6" android:scaleX="2.2" android:scaleY="2.2">
+        <path android:pathData="M8,3 C8,8 16,8 16,12 C16,16 8,16 8,21 M16,3 C16,8 8,8 8,12 C8,16 16,16 16,21" android:fillColor="#00000000" android:strokeColor="#FFFFFFFF" android:strokeWidth="2" android:strokeLineCap="round" />
+        <path android:pathData="M9.4,4.6 h5.2 M9,12 h6 M9.4,19.4 h5.2" android:fillColor="#00000000" android:strokeColor="#CCFFFFFF" android:strokeWidth="1.6" android:strokeLineCap="round" />
+    </group>
+</vector>
