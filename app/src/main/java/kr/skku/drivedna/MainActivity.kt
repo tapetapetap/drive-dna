@@ -13,7 +13,7 @@ import android.widget.ScrollView
 /** 상황 화면(오른쪽, 세로는 위)과 나의 DNA 칸(왼쪽, 세로는 아래). 상태 우선순위는 data-model §8 */
 class MainActivity : Activity() {
 
-    private enum class State { DRIVING, TYPES, RECORD, HISTORY, FIRST, SHORT, RESULT }
+    private enum class State { DRIVING, TYPES, TAGS, RECORD, HISTORY, FIRST, SHORT, RESULT }
 
     private lateinit var records: Records
     private lateinit var ui: Ui
@@ -35,9 +35,12 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.dnaPane).background = GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(getColor(R.color.pane_top), getColor(R.color.pane_bottom)),
         )
-        if (Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
+        // 위치(끝난 곳 한 점, 이동 범위 태그)는 런타임 권한이다. 거부돼도 앱은 돌고 위치 없는 운전으로 남는다
+        val need = listOfNotNull(
+            Manifest.permission.POST_NOTIFICATIONS.takeIf { Build.VERSION.SDK_INT >= 33 },
+            "pleos.car.permission.FUSED_LOCATION",
+        ).filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (need.isNotEmpty()) requestPermissions(need.toTypedArray(), 0)
         WatchService.start(this)
     }
 
@@ -84,6 +87,7 @@ class MainActivity : Activity() {
         val state = when {
             WatchService.driving -> State.DRIVING
             page == State.TYPES -> State.TYPES
+            page == State.TAGS -> State.TAGS
             recordIndex != null -> State.RECORD
             page == State.HISTORY -> State.HISTORY
             last == null -> State.FIRST
@@ -100,9 +104,11 @@ class MainActivity : Activity() {
         if (WatchService.noSignal) screen.addView(ui.banner(NO_SIGNAL), lp(bottom = 28))
         shownCode = null
         val profile = Profile.of(analyzed, limits)
+        val tags = Tags.all(all, limits)
         screen.addView(when (state) {
             State.DRIVING -> ui.driving(WatchService.recording)
             State.TYPES -> ui.types(profile.code.takeIf { profile.drives > 0 }, typesFor) { open(null) }
+            State.TAGS -> ui.tags(tags) { open(null) }
             State.RECORD -> resultScreen(analyzed, recordIndex!!)
             State.HISTORY -> ui.history(analyzed, limits,
                 onOpen = { listY = scroll.scrollY; openRecord = it.endedAt; render() },
@@ -117,7 +123,8 @@ class MainActivity : Activity() {
 
         findViewById<LinearLayout>(R.id.dnaPane).apply {
             removeAllViews()
-            addView(ui.profile(profile, WatchService.driving, onHistory = { open(State.HISTORY) }, onTypes = { open(State.TYPES) }), lp())
+            addView(ui.profile(profile, tags, WatchService.driving,
+                onHistory = { open(State.HISTORY) }, onTypes = { open(State.TYPES) }, onTags = { open(State.TAGS) }), lp())
         }
     }
 

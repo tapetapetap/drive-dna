@@ -6,6 +6,7 @@ junit = "4.13.2"
 pleosVehicle = "2.3.2"
 pleosVehicleData = "1.1.11"
 pleosTts = "3.3.1"
+pleosLocation = "1.1.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -13,6 +14,7 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 pleos-vehicle = { group = "ai.pleos.playground", name = "Vehicle", version.ref = "pleosVehicle" }
 pleos-vehicle-data = { group = "ai.pleos.playground", name = "vehicle-data", version.ref = "pleosVehicleData" }
 pleos-tts = { group = "ai.pleos.playground", name = "TextToSpeech", version.ref = "pleosTts" }
+pleos-location = { group = "ai.pleos.playground", name = "FusedLocation", version.ref = "pleosLocation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 디버그 빌드에만 들어간다: 보조 태그 신호(크루즈·와이퍼·SOC·착좌)를 에뮬레이터에서 재는 수신기 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="pleos.car.permission.CAR_SEATS" />
+    <uses-permission android:name="pleos.car.permission.CAR_WINDOWS" />
+    <application>
+        <receiver android:name=".ProbeReceiver" android:exported="true" />
+    </application>
+</manifest>

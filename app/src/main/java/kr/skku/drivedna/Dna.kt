@@ -28,12 +28,26 @@ data class Metrics(
     val speedCv: Double? = null,
     val kwhPer100: Double? = null,
     val analyzed: Boolean = false,
+    // 보조 태그(specs/002-tags data-model §2). null = 그 신호를 받지 못함
+    val cruiseMs: Long? = null,
+    val socStart: Int? = null,
+    val socEnd: Int? = null,
+    val endLat: Double? = null,
+    val endLon: Double? = null,
+    val passenger: Boolean? = null,
+    val wiperMs: Long? = null,
 ) {
     val avgKmh get() = if (movingMs > 0) km / (movingMs / 3_600_000.0) else 0.0
 
     /** 주행거리 값이 거칠어 속도를 추정하지 못함. 속도에서 나오는 지표(급가속·급감속·속도 변동)가 모두 없음 */
     val noSpeed get() = hardAccel == null
     fun per10(n: Int?) = if (km > 0 && n != null) n / km * 10 else 0.0
+
+    /** 역동성 지수: 10km당 급가속·급감속·빠른 조향(축과 상황 태그가 같은 값을 본다) */
+    val dynIdx get() = per10((hardAccel ?: 0) + (hardDecel ?: 0) + (quickSteers ?: 0))
+
+    /** 로그용 한 줄. 위치는 기기 안 기록에만 두므로 좌표를 빼고 있음/없음만 쓴다(헌법 VI) */
+    fun logLine() = "${copy(endLat = null, endLon = null)} 위치 ${if (endLat != null) "있음" else "없음"}"
 }
 
 /**
@@ -58,6 +72,12 @@ class Tracker(private val clock: () -> Long) {
     private var kmh = 0.0 // 마지막 추정 속도
     private var steerDeg: Double? = null
     private var battery: Double? = null
+    private var cruiseOn: Boolean? = null // null = 크루즈 값 없음(준비 안 됨 포함)
+    private var wiperOn: Boolean? = null
+    private var socNow: Int? = null
+    private var seatNow: Boolean? = null
+    private var lat: Double? = null
+    private var lon: Double? = null
 
     // 운전 하나
     private var start = 0L
@@ -74,6 +94,10 @@ class Tracker(private val clock: () -> Long) {
     private var inTurn = false
     private var lastQuick: Long? = null
     private var batteryStart: Double? = null
+    private val cruise = OnTime()
+    private val wiper = OnTime()
+    private var socStart: Int? = null
+    private var passenger: Boolean? = null
     private var coarse = false
     private val kmSamples = ArrayDeque<Pair<Long, Double>>()
     private val speeds = ArrayDeque<Pair<Long, Double>>()
@@ -154,6 +178,34 @@ class Tracker(private val clock: () -> Long) {
         }
     }
 
+    /** 크루즈: null = 준비 안 됨(값 없음), true = 작동(ACTIVATED), false = 그 밖(대기 등) */
+    fun cruise(active: Boolean?) {
+        cruiseOn = active
+        if (driving) cruise.set(active, clock())
+    }
+
+    fun wiper(on: Boolean) {
+        wiperOn = on
+        if (driving) wiper.set(on, clock())
+    }
+
+    /**
+     * 운전이 시작됐는데 시작 값이 없었으면(구독 값이 늦게 옴) 처음 온 값을 시작 값으로 본다.
+     * [start]는 운전 시작 때 getter로 다시 읽은 값이다. 구독 첫 값이 엇갈려 와도(research R8) 이것이 시작 값이다
+     */
+    fun soc(pct: Int, start: Boolean = false) {
+        socNow = pct
+        if (driving && (start || socStart == null)) socStart = pct
+    }
+
+    fun seat(occupied: Boolean, start: Boolean = false) {
+        seatNow = occupied
+        if (driving && (start || passenger == null)) passenger = occupied
+    }
+
+    /** 마지막 위치 한 점만 든다. 경로는 남기지 않는다 */
+    fun place(lat: Double, lon: Double) { this.lat = lat; this.lon = lon }
+
     fun batteryWh(v: Double) {
         battery = v
         if (driving && batteryStart == null) batteryStart = v
@@ -168,6 +220,9 @@ class Tracker(private val clock: () -> Long) {
         odo?.let { kmSamples.addLast(start to it) }
         steerDeg?.let { steers.addLast(start to it) }
         batteryStart = battery
+        cruise.start(cruiseOn, start); wiper.start(wiperOn, start)
+        socStart = socNow; passenger = seatNow
+        lat = null; lon = null // 끝난 곳은 이번 운전 중에 받은 위치만. 못 받으면 "위치 없음"
         // 운전 시작 때 이미 켜져 있던 방향지시등·브레이크는 시작 때 켠 것. 운전 전에 켰다 끈 기록은 쓰지 않는다
         turnOnAt = if (signalOn) start else null
         if (brakeOn == true) brakes = 1
@@ -189,7 +244,36 @@ class Tracker(private val clock: () -> Long) {
             quickSteers = quick.takeIf { steer },
             speedCv = cv(moving).takeUnless { coarse },
             kwhPer100 = if (used != null && used > 0 && km > 0) used / 1000 / km * 100 else null,
+            cruiseMs = cruise.end(clock()),
+            socStart = socStart,
+            socEnd = socNow,
+            endLat = lat,
+            endLon = lon,
+            passenger = passenger,
+            wiperMs = wiper.end(clock()),
         )
+    }
+
+    /** 켜진 시간 세기(크루즈·와이퍼). null이 아닌 값을 한 번도 못 받은 운전은 null */
+    private class OnTime {
+        private var on = false
+        private var since = 0L
+        private var total = 0L
+        private var seen = false
+
+        fun start(v: Boolean?, now: Long) { total = 0; seen = v != null; on = v == true; since = now }
+
+        fun set(v: Boolean?, now: Long) {
+            if (on) total += now - since
+            if (v != null) seen = true
+            on = v == true; since = now
+        }
+
+        fun end(now: Long): Long? {
+            if (on) total += now - since
+            on = false
+            return total.takeIf { seen }
+        }
     }
 
     companion object {
@@ -211,10 +295,14 @@ class Tracker(private val clock: () -> Long) {
 }
 
 /** 보류·짧은 운전 기준. 시연용(디버그) 빌드는 낮춘다(research R4) */
-data class Limits(val minDriveMs: Long, val minDriveKm: Double, val minAxisKm: Double, val minMovingMs: Long, val minTurns: Int) {
+data class Limits(
+    val minDriveMs: Long, val minDriveKm: Double, val minAxisKm: Double, val minMovingMs: Long, val minTurns: Int,
+    // 보조 태그(specs/002-tags data-model §3)
+    val longMs: Long, val longKmh: Double, val rainMs: Long, val rangeMin: Int, val situMin: Int,
+) {
     companion object {
-        val RELEASE = Limits(3 * MINUTE, 1.0, 2.0, 3 * MINUTE, 3)
-        val DEMO = Limits(30_000, 0.2, 0.3, 30_000, 2)
+        val RELEASE = Limits(3 * MINUTE, 1.0, 2.0, 3 * MINUTE, 3, 30 * MINUTE, 60.0, 3 * MINUTE, 20, 3)
+        val DEMO = Limits(30_000, 0.2, 0.3, 30_000, 2, MINUTE, 20.0, 30_000, 5, 2)
     }
 }
 
@@ -253,7 +341,7 @@ object Judge {
 
     private fun dyn(m: Metrics, l: Limits): Axis {
         val q = m.quickSteers
-        val idx = m.per10((m.hardAccel ?: 0) + (m.hardDecel ?: 0) + (q ?: 0))
+        val idx = m.dynIdx
         val why = when {
             m.noSpeed -> COARSE
             q == null -> "조향 신호가 없어 판정을 미뤘어요"
@@ -366,20 +454,124 @@ object Coach {
 object RecordFormat {
     fun encode(list: List<Metrics>) = list.joinToString("\n") { m ->
         listOf(m.endedAt, m.durationMs, m.km, m.movingMs, m.hardAccel, m.hardDecel, m.brakes, m.turns, m.early,
-            m.quickSteers, m.speedCv, m.kwhPer100, if (m.analyzed) 1 else 0).joinToString(",") { it?.toString() ?: "" }
+            m.quickSteers, m.speedCv, m.kwhPer100, if (m.analyzed) 1 else 0,
+            m.cruiseMs, m.socStart, m.socEnd, m.endLat, m.endLon, m.passenger?.let { if (it) 1 else 0 }, m.wiperMs,
+        ).joinToString(",") { it?.toString() ?: "" }
     }
 
     fun decode(s: String?): List<Metrics> = s.orEmpty().lines().mapNotNull { line ->
         val p = line.split(',')
-        if (p.size != 13) return@mapNotNull null
-        fun int(i: Int) = p[i].ifEmpty { null }?.toInt()
-        fun dbl(i: Int) = p[i].ifEmpty { null }?.toDouble()
+        if (p.size != 13 && p.size != 20) return@mapNotNull null // 13칸은 1차 형식
+        fun int(i: Int) = p.getOrNull(i)?.ifEmpty { null }?.toInt()
+        fun lng(i: Int) = p.getOrNull(i)?.ifEmpty { null }?.toLong()
+        fun dbl(i: Int) = p.getOrNull(i)?.ifEmpty { null }?.toDouble()
         runCatching {
             Metrics(p[0].toLong(), p[1].toLong(), p[2].toDouble(), p[3].toLong(), int(4), int(5),
-                int(6), int(7), int(8), int(9), dbl(10), dbl(11), p[12] == "1")
+                int(6), int(7), int(8), int(9), dbl(10), dbl(11), p[12] == "1",
+                lng(13), int(14), int(15), dbl(16), dbl(17), p.getOrNull(18)?.ifEmpty { null }?.let { it == "1" }, lng(19))
         }.getOrNull()
     }
 
     /** 오래된 것이 앞. 최신 100개만 남긴다 */
     fun add(old: List<Metrics>, m: Metrics) = (old + m).takeLast(100)
+}
+
+/* ---------- 보조 태그(specs/002-tags data-model §4·§5) ---------- */
+
+/** 태그 종류. left·right는 판정 이름(value false·true) */
+enum class TagId(val title: String, val left: String, val right: String) {
+    CRUISE("크루즈", "직접 운전형", "크루즈 위임형"),
+    CHARGE("충전", "한계 활용형", "여유 충전형"),
+    RANGE("이동 범위", "루틴형", "탐험형"),
+    PASSENGER("동승", "동승 한결형", "동승 맞춤형"),
+    RAIN("빗길", "빗길 한결형", "빗길 맞춤형"),
+}
+
+/** value null = 보류(withheld가 이유). fact = 관측 문장(대상이 최소 수보다 적으면 null) */
+data class Tag(val id: TagId, val value: Boolean?, val fact: String?, val withheld: String?) {
+    val name get() = value?.let { if (it) id.right else id.left }
+}
+
+/** 같은편 Pick.kt의 xy와 같은 평면 근사(m). cos에는 첫 점의 위도 */
+fun meters(lat1: Double, lon1: Double, lat2: Double, lon2: Double) =
+    Math.hypot((lon2 - lon1) * Math.cos(Math.toRadians(lat1)) * 111_320.0, (lat2 - lat1) * 110_540.0)
+
+object Tags {
+    private const val MIN = 3 // 크루즈·충전 최소 횟수
+    private const val CHARGE_JUMP = 10 // 다음 시작 SOC − 앞 끝 SOC가 이만큼(%p) 이상이면 충전
+    private const val PLACE_M = 150.0
+
+    /** [oldestFirst]는 기록 전체(오래된 것부터). 숨긴 태그는 목록에 없다 */
+    fun all(oldestFirst: List<Metrics>, l: Limits): List<Tag> {
+        val a = oldestFirst.filter { it.analyzed } // 나의 DNA와 같은 운전 묶음(저장 때 정한 값)
+        return listOfNotNull(
+            cruise(a, l), charge(oldestFirst), range(a, l),
+            situation(TagId.PASSENGER, "동승", "혼자", a, l) { it.passenger },
+            situation(TagId.RAIN, "비", "맑은", a, l) { m -> m.wiperMs?.let { it >= l.rainMs } },
+        )
+    }
+
+    private fun median(xs: List<Double>) = xs.sorted().let { s -> if (s.size % 2 == 1) s[s.size / 2] else (s[s.size / 2 - 1] + s[s.size / 2]) / 2 }
+
+    private fun pct(x: Double) = (x * 100).roundToInt()
+
+    /** 기준 사이(left ≤ … ≤ right 바깥이 판정)로 정하고 사이는 [middle] 이유로 보류 */
+    private fun judge(id: TagId, v: Double, leftMax: Double, rightMin: Double, fact: String, middle: String) = when {
+        v >= rightMin -> Tag(id, true, fact, null)
+        v <= leftMax -> Tag(id, false, fact, null)
+        else -> Tag(id, null, fact, middle)
+    }
+
+    private fun cruise(a: List<Metrics>, l: Limits): Tag? {
+        if (a.none { it.cruiseMs != null }) return null // 크루즈 값이 없는 차
+        val long = a.filter { it.cruiseMs != null && it.durationMs >= l.longMs && it.avgKmh >= l.longKmh }
+        if (long.size < MIN) return Tag(TagId.CRUISE, null, null, "장거리 운전이 ${long.size}번뿐이에요(${MIN}번 필요)")
+        val med = median(long.map { it.cruiseMs!!.toDouble() / it.durationMs })
+        return judge(TagId.CRUISE, med, 0.15, 0.5, "장거리 운전 ${long.size}번의 크루즈 비율 중앙값 ${pct(med)}%", "크루즈를 쓰는 정도가 운전마다 달라요")
+    }
+
+    /** 짧은 운전도 이어 본다: 빼면 그 사이 충전을 놓친다 */
+    private fun charge(all: List<Metrics>): Tag {
+        val pre = all.zipWithNext().mapNotNull { (p, n) ->
+            val e = p.socEnd; val s = n.socStart
+            if (e != null && s != null && s - e >= CHARGE_JUMP) e.toDouble() else null
+        }
+        if (pre.size < MIN) return Tag(TagId.CHARGE, null, null, "충전이 ${pre.size}번뿐이에요(${MIN}번 필요)")
+        val med = median(pre)
+        return judge(TagId.CHARGE, med, 25.0, 40.0, "충전 ${pre.size}번의 충전 직전 배터리 중앙값 ${med.roundToInt()}%(집 충전 포함)", "충전하는 때가 그때그때 달라요")
+    }
+
+    private class Place(val lat: Double, val lon: Double, var count: Int = 1)
+
+    private fun range(a: List<Metrics>, l: Limits): Tag {
+        val pts = a.mapNotNull { m -> m.endLat?.let { lat -> m.endLon?.let { lat to it } } }
+        if (pts.size < l.rangeMin) return Tag(TagId.RANGE, null, null, "운전이 ${pts.size}번 쌓였어요(${l.rangeMin}번 필요)")
+        val places = mutableListOf<Place>()
+        var fresh = 0
+        for ((lat, lon) in pts) {
+            // 기준점은 장소를 처음 만든 점(고정). 둘 이상 걸리면 가장 가까운 곳
+            val near = places.map { it to meters(it.lat, it.lon, lat, lon) }.filter { it.second <= PLACE_M }.minByOrNull { it.second }?.first
+            if (near != null) near.count++ else { places += Place(lat, lon); fresh++ }
+        }
+        val newRatio = fresh.toDouble() / pts.size
+        val top2 = places.map { it.count }.sortedDescending().take(2).sum().toDouble() / pts.size
+        return judge(TagId.RANGE, newRatio, 0.10, 0.30, "새 장소 ${pct(newRatio)}% · 자주 가는 2곳이 ${pct(top2)}%", "새 곳과 늘 가던 곳이 섞여 있어요")
+    }
+
+    /** 같은 사람의 평소와 그 상황을 비교한다. 변화의 크기만 보고 방향은 판정하지 않는다 */
+    private fun situation(id: TagId, what: String, other: String, a: List<Metrics>, l: Limits, isSitu: (Metrics) -> Boolean?): Tag {
+        val (s, n) = a.filter { it.hardAccel != null && isSitu(it) != null }.partition { isSitu(it) == true }
+        if (s.size < l.situMin) return Tag(id, null, null, "$what 운전이 ${s.size}번뿐이에요(${l.situMin}번 필요)")
+        if (n.size < l.situMin) return Tag(id, null, null, "$other 운전이 ${n.size}번뿐이에요(${l.situMin}번 필요)")
+        val ms = s.map { it.dynIdx }.average(); val mn = n.map { it.dynIdx }.average()
+        val c = if (mn > 0) (ms - mn) / mn else if (ms == 0.0) 0.0 else Double.POSITIVE_INFINITY
+        val x = if (c.isInfinite()) 0 else pct(abs(c))
+        val fact = when {
+            c.isInfinite() -> "평소엔 급한 조작이 없었는데 $what 운전 ${s.size}번에선 있었어요"
+            c == 0.0 -> "$what 운전 ${s.size}번의 역동성 지수가 평소와 같아요"
+            abs(c) <= 0.10 -> "$what 운전 ${s.size}번의 역동성 지수가 평소와 비슷해요(차이 $x%)"
+            else -> "$what 운전 ${s.size}번의 역동성 지수가 평소보다 $x% ${if (c < 0) "낮아요" else "높아요"}"
+        }
+        return judge(id, abs(c), 0.10, 0.25, fact, "평소와 차이가 애매해요(차이 $x%)")
+    }
 }

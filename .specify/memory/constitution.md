@@ -18,12 +18,12 @@ YAGNI → 표준 라이브러리 → 플랫폼 기능 → 이미 있는 의존�
 지표 계산, 축 판정, 유형, 누적, 코칭 문장 선택은 안드로이드 없이 돌아가는 순수 코드로 두고, 각각 실패하면 깨지는 JUnit 테스트를 하나 이상 둔다.
 
 ### VI. 기록은 차 안에만
-운전 기록은 기기 안에만 저장한다. 서버, 계정, 외부 전송, 위치·경로 수집을 두지 않는다.
+운전 기록은 기기 안에만 저장한다. 서버, 계정, 외부 전송, 경로 수집을 두지 않는다. 위치는 운전이 끝난 곳 한 점만 기기 안 기록에 두고, 화면에는 비율만 보이며 로그에도 남기지 않는다(1.1.0, 보조 태그의 이동 범위).
 
 ## Constraints
 
 - 플랫폼: Pleos Connect (AAOS, API 34 에뮬레이터), Kotlin, JDK 17, Android View
-- Vehicle SDK 권한은 실제로 쓰는 조회 권한만 선언한다(CAR_DRIVE, CAR_LIGHTS, CAR_ENERGY, TTS_SERVICE).
+- Vehicle SDK 권한은 실제로 쓰는 조회 권한만 선언한다(CAR_DRIVE, CAR_LIGHTS, CAR_ENERGY, CAR_SEATS, CAR_WINDOWS, FUSED_LOCATION, TTS_SERVICE).
 - 기준 수치는 검증 전 잠정값이며, 문서와 화면에 그렇게 적는다.
 
 ## Development Workflow
@@ -34,4 +34,4 @@ brainstorming(설계 문서) → /speckit-specify → /speckit-plan → /speckit
 
 이 문서는 plan의 Constitution Check 기준이다. 원칙을 어기는 설계는 plan의 Complexity Tracking에 이유를 적는다.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-09 | **Last Amended**: 2026-11-09
+**Version**: 1.1.0 | **Ratified**: 2026-11-09 | **Last Amended**: 2026-11-10

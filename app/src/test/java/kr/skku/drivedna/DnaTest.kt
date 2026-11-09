@@ -308,11 +308,19 @@ class ScenarioTest {
         val r = Road()
         r.start()
         var v = 0.0; var steer = 0.0; var nextKm = r.now + 1020; var sentSteer = 0.0; var kwh = 0.0
+        var socEnd: Int? = null; var place: Pair<Double, Double>? = null
         for (line in lines) {
             val p = line.split(Regex("\\s+"))
-            if (p[0] == "kwh") { kwh = p[1].toDouble(); continue }
+            when (p[0]) { // 보조 태그 지시어(specs/002-tags quickstart)
+                "kwh" -> { kwh = p[1].toDouble(); continue }
+                "soc" -> { r.t.soc(p[1].toInt()); socEnd = p[2].toInt(); continue }
+                "seat" -> { r.t.seat(p[1] == "1"); continue }
+                "place" -> { place = p[1].toDouble() to p[2].toDouble(); continue }
+            }
             val secs = p[0].toDouble(); val v1 = p[1].toDouble(); val s1 = p[2].toDouble()
             r.t.brake(p[3] == "1"); r.t.turn(when (p[4]) { "Left" -> -1; "Right" -> 1; else -> 0 })
+            val flags = p.getOrElse(5) { "" }
+            r.t.cruise('C' in flags); r.t.wiper('W' in flags)
             val v0 = v; val s0 = steer; val steps = (secs / 0.2).toInt()
             for (i in 1..steps) {
                 r.now += 200
@@ -323,6 +331,8 @@ class ScenarioTest {
             }
         }
         r.t.turn(0)
+        socEnd?.let { r.t.soc(it) }
+        place?.let { r.t.place(it.first, it.second) }
         r.at(200) { batteryWh(60_000.0 - kwh * 1000) }
         r.at(2000) { km(r.odo) }
         return r.park()
@@ -355,4 +365,227 @@ class ScenarioTest {
     }
 
     @Test fun shortIsNotAnalyzed() = assertFalse(Judge.analyzed(replay("short"), Limits.DEMO))
+
+    @Test fun highwayUsesCruiseAndCharges() {
+        val m = replay("highway")
+        assertEquals(85, m.socStart); assertEquals(78, m.socEnd)
+        assertTrue(m.cruiseMs!!.toDouble() / m.durationMs >= 0.5)
+        assertEquals(false, m.passenger)
+        assertEquals(37.2839144, m.endLat!!, 1e-9)
+        assertTrue(Judge.analyzed(m, Limits.DEMO))
+    }
+
+    /** scripts/seed.txt(시연 샘플 24개)가 태그 다섯을 모두 판정하고, highway를 더해도 판정이 그대로인지 */
+    @Test fun seedJudgesAllFiveTags() {
+        val seed = RecordFormat.decode(File("../scripts/seed.txt").readText())
+        assertEquals(24, seed.size)
+        val want = mapOf(TagId.CRUISE to "크루즈 위임형", TagId.CHARGE to "여유 충전형", TagId.RANGE to "루틴형",
+            TagId.PASSENGER to "동승 맞춤형", TagId.RAIN to "빗길 한결형")
+        assertEquals(want, Tags.all(seed, Limits.DEMO).associate { it.id to it.name })
+        val after = Tags.all(seed + replay("highway").copy(endedAt = seed.last().endedAt + MINUTE, analyzed = true), Limits.DEMO)
+        assertEquals(want, after.associate { it.id to it.name })
+        assertTrue(after.single { it.id == TagId.CRUISE }.fact!!.startsWith("장거리 운전 4번"))
+        assertTrue(after.single { it.id == TagId.CHARGE }.fact!!.startsWith("충전 4번"))
+    }
+}
+
+/** 보조 태그용 새 신호(specs/002-tags data-model §1·§2·§6, tasks T004) */
+class TagSignalTest {
+    @Test fun cruiseTimeAccumulatesUntilParked() {
+        val m = Road().start().at(10_000) { cruise(true) }.at(20_000) { cruise(false) }.at(5_000) { cruise(true) }.at(5_000) {}.park()
+        assertEquals(25_000L, m.cruiseMs) // 20초 + 끝까지 5초
+    }
+
+    @Test fun cruiseOnBeforeDriveCountsFromStart() {
+        assertEquals(10_000L, Road().at(0) { cruise(true) }.start().at(10_000) {}.park().cruiseMs)
+    }
+
+    @Test fun cruiseValueRules() {
+        assertNull(Road().start().at(1_000) { cruise(null) }.park().cruiseMs) // 준비 안 됨(null)만 → 값 없음
+        assertNull(Road().start().go(36.0, 5).park().cruiseMs) // 아무 값도 없음
+        assertEquals(0L, Road().start().at(1_000) { cruise(false) }.park().cruiseMs) // 대기(ENABLED) → 0
+    }
+
+    @Test fun wiperTimeLikeCruise() {
+        val m = Road().start().at(1_000) { wiper(true) }.at(30_000) { wiper(false) }.park()
+        assertEquals(30_000L, m.wiperMs)
+        assertNull(Road().start().park().wiperMs)
+    }
+
+    @Test fun socPassengerAndEndPlace() {
+        val m = Road().at(0) { soc(80); seat(true); place(37.30, 126.97) }.start()
+            .at(10_000) { soc(75); seat(false); place(37.2839, 126.9896) }.park()
+        assertEquals(80, m.socStart); assertEquals(75, m.socEnd)
+        assertEquals(true, m.passenger) // 운전 시작 때 값
+        assertEquals(37.2839, m.endLat!!, 1e-9); assertEquals(126.9896, m.endLon!!, 1e-9)
+        val none = Road().start().park()
+        assertNull(none.socStart); assertNull(none.socEnd); assertNull(none.passenger); assertNull(none.endLat)
+    }
+
+    @Test fun startGetterWinsAndAPlaceFromBeforeTheDriveIsDropped() {
+        // 구독 첫 값이 엇갈려 와도 운전 시작 때 getter로 다시 읽은 값이 시작 값이다(코드 리뷰 반영)
+        val m = Road().at(0) { soc(50); seat(false); place(37.30, 126.97) }.start()
+            .at(100) { soc(85, start = true); seat(true, start = true) }.at(10_000) {}.park()
+        assertEquals(85, m.socStart); assertEquals(true, m.passenger)
+        assertNull(m.endLat) // 이번 운전 중에 받은 위치가 없다
+    }
+
+    @Test fun lateStartValuesFillIn() {
+        val m = Road().start().at(500) { soc(66); seat(false) }.at(10_000) { soc(60); seat(true) }.park()
+        assertEquals(66, m.socStart); assertEquals(60, m.socEnd); assertEquals(false, m.passenger)
+    }
+
+    @Test fun recordFormatHas20FieldsAndReadsOld13() {
+        val a = Metrics(endedAt = 7, durationMs = 60_000, km = 1.0, cruiseMs = 30_000, socStart = 80, socEnd = 72,
+            endLat = 37.2839144, endLon = 126.9896135, passenger = true, wiperMs = 0)
+        val b = Metrics(endedAt = 8, durationMs = 15_000, km = 0.1) // 새 값 없음
+        val text = RecordFormat.encode(listOf(a, b))
+        assertEquals(20, text.lines()[0].split(',').size)
+        assertEquals(listOf(a, b), RecordFormat.decode(text))
+        val old = "5,15000,0.08,0,0,0,,,,,,,0" // 1차 13칸
+        assertEquals(listOf(Metrics(endedAt = 5, durationMs = 15_000, km = 0.08, movingMs = 0)), RecordFormat.decode(old))
+        assertEquals(emptyList<Metrics>(), RecordFormat.decode("1,2,3,4,5,6,7,8,9,10,11,12,1,9"))
+    }
+
+    @Test fun logLineHasNoCoordinates() {
+        val line = Metrics(endedAt = 1, km = 2.0, endLat = 37.2839144, endLon = 126.9896135).logLine()
+        assertFalse(line.contains("37.28")); assertFalse(line.contains("126.98"))
+        assertTrue(line.endsWith("위치 있음"))
+        assertTrue(Metrics(endedAt = 1).logLine().endsWith("위치 없음"))
+    }
+}
+
+/** 보조 태그 판정(data-model §4·§4-1·§5, tasks T006·T013·T015·T017). 모두 Limits.RELEASE */
+class TagTest {
+    private val l = Limits.RELEASE
+    private fun tags(list: List<Metrics>) = Tags.all(list, l)
+    private fun tag(list: List<Metrics>, id: TagId) = tags(list).single { it.id == id }
+
+    /** 분석되는 보통 운전(10분·10km). 역동성 지수 = hardAccel(10km라 10km당 개수와 같다) */
+    private fun drive(idx: Int = 10) = Metrics(durationMs = 10 * MINUTE, km = 10.0, movingMs = 10 * MINUTE, hardAccel = idx, hardDecel = 0, quickSteers = 0, analyzed = true)
+    /** 장거리(40분·50km, 평균 시속 75km), 크루즈 비율 [ratio] */
+    private fun long(ratio: Double) = Metrics(durationMs = 40 * MINUTE, km = 50.0, movingMs = 40 * MINUTE, hardAccel = 0, hardDecel = 0,
+        quickSteers = 0, cruiseMs = (ratio * 40 * MINUTE).toLong(), analyzed = true)
+
+    // ---------- 크루즈 (T006) ----------
+    @Test fun cruiseExamples() {
+        val a = tag(listOf(0.70, 0.65, 0.80).map(::long), TagId.CRUISE)
+        assertEquals("크루즈 위임형", a.name)
+        assertEquals("장거리 운전 3번의 크루즈 비율 중앙값 70%", a.fact)
+        assertEquals("직접 운전형", tag(listOf(0.05, 0.0, 0.10).map(::long), TagId.CRUISE).name)
+        val c = tag(listOf(0.60, 0.05, 0.30).map(::long), TagId.CRUISE)
+        assertNull(c.value); assertEquals("크루즈를 쓰는 정도가 운전마다 달라요", c.withheld)
+    }
+
+    @Test fun cruiseNeedsThreeLongDrivesAndHidesWithoutSignal() {
+        val two = tag(listOf(long(0.7), long(0.7), drive().copy(cruiseMs = 0)), TagId.CRUISE)
+        assertNull(two.value); assertNull(two.fact); assertEquals("장거리 운전이 2번뿐이에요(3번 필요)", two.withheld)
+        assertTrue(tags(listOf(drive(), drive())).none { it.id == TagId.CRUISE }) // 크루즈 값이 없는 차
+        val short = Metrics(durationMs = 20_000, km = 0.1, cruiseMs = 20_000) // 분석 안 되는 운전은 빠진다
+        assertEquals("크루즈 위임형", tag(listOf(long(0.7), long(0.7), long(0.7), short, short), TagId.CRUISE).name)
+        assertEquals("장거리 운전 4번의 크루즈 비율 중앙값 40%", tag(listOf(0.1, 0.2, 0.6, 0.7).map(::long), TagId.CRUISE).fact) // 짝수 중앙값
+    }
+
+    // ---------- 충전 (T013) ----------
+    /** 충전 직전 배터리가 [pre]가 되도록 이어진 운전들 */
+    private fun charges(vararg pre: Int): List<Metrics> {
+        val out = mutableListOf(drive().copy(socStart = 90, socEnd = pre[0]))
+        pre.forEachIndexed { i, p -> out += drive().copy(socStart = p + 30, socEnd = pre.getOrElse(i + 1) { 50 }) }
+        return out
+    }
+
+    @Test fun chargeExamples() {
+        val a = tag(charges(55, 48, 60), TagId.CHARGE)
+        assertEquals("여유 충전형", a.name)
+        assertEquals("충전 3번의 충전 직전 배터리 중앙값 55%(집 충전 포함)", a.fact)
+        assertEquals("한계 활용형", tag(charges(18, 12, 22), TagId.CHARGE).name)
+        assertEquals("충전하는 때가 그때그때 달라요", tag(charges(45, 15, 30), TagId.CHARGE).withheld)
+    }
+
+    @Test fun chargeDetectionRules() {
+        val nine = listOf(drive().copy(socEnd = 40), drive().copy(socStart = 49)) // +9%p는 충전이 아님
+        assertEquals("충전이 0번뿐이에요(3번 필요)", tag(nine, TagId.CHARGE).withheld)
+        val gap = listOf(drive().copy(socEnd = 40), drive(), drive().copy(socStart = 90)) // SOC 없는 운전이 끼면 찾지 않음
+        assertEquals("충전이 0번뿐이에요(3번 필요)", tag(gap, TagId.CHARGE).withheld)
+        val withShort = listOf(drive().copy(socEnd = 30), Metrics(durationMs = 20_000, km = 0.1, socStart = 80, socEnd = 79)) // 짧은 운전도 이어 본다
+        assertEquals("충전이 1번뿐이에요(3번 필요)", tag(withShort, TagId.CHARGE).withheld)
+    }
+
+    // ---------- 이동 범위 (T015) ----------
+    private val home = 37.2839 to 126.9896
+    private val work = 37.3003 to 126.9712
+    private fun at(p: Pair<Double, Double>) = drive().copy(endLat = p.first, endLon = p.second)
+    /** home에서 동쪽으로 [m]미터 */
+    private fun east(m: Double) = home.first to home.second + m / (Math.cos(Math.toRadians(home.first)) * 111_320)
+    private fun others(n: Int) = (1..n).map { at(37.25 + it * 0.01 to 127.05) }
+
+    @Test fun rangeExamples() {
+        val a = tag(List(15) { at(home) } + List(15) { at(work) }, TagId.RANGE)
+        assertEquals("루틴형", a.name); assertEquals("새 장소 7% · 자주 가는 2곳이 100%", a.fact)
+        val b = tag(List(10) { at(home) } + List(8) { at(work) } + others(12), TagId.RANGE)
+        assertEquals("탐험형", b.name); assertEquals("새 장소 47% · 자주 가는 2곳이 60%", b.fact)
+        val c = tag(List(14) { at(home) } + List(12) { at(work) } + others(4), TagId.RANGE)
+        assertNull(c.value); assertEquals("새 곳과 늘 가던 곳이 섞여 있어요", c.withheld)
+    }
+
+    @Test fun rangeClusteringAndMinimum() {
+        assertEquals(149.0, meters(home.first, home.second, east(149.0).first, east(149.0).second), 0.5)
+        val same = List(19) { at(home) } + at(east(149.0))
+        assertEquals("새 장소 5% · 자주 가는 2곳이 100%", tag(same, TagId.RANGE).fact) // 149m는 같은 장소: 새 장소 1번
+        val far = List(19) { at(home) } + at(east(151.0))
+        assertEquals("새 장소 10% · 자주 가는 2곳이 100%", tag(far, TagId.RANGE).fact)
+        // 기준점은 첫 점: 100m, 200m 점이 차례로 오면 200m 점은 새 장소(100m 점을 기준으로 삼지 않음)
+        val chain = List(18) { at(home) } + at(east(100.0)) + at(east(200.0))
+        assertEquals("새 장소 10% · 자주 가는 2곳이 100%", tag(chain, TagId.RANGE).fact)
+        // 둘 다 150m 안이면 가까운 곳에 더한다: 140m 점은 집(140m)이 아니라 250m 장소(110m)에 → 상위 2곳 9+8
+        val farAway = 37.26 to 127.05
+        val two = List(3) { at(home) } + List(8) { at(east(250.0)) } + List(8) { at(farAway) } + at(east(140.0))
+        assertEquals("새 장소 15% · 자주 가는 2곳이 85%", tag(two, TagId.RANGE).fact)
+        assertEquals("운전이 12번 쌓였어요(20번 필요)", tag(List(12) { at(home) }, TagId.RANGE).withheld)
+        assertNull(tag(List(12) { at(home) }, TagId.RANGE).fact)
+        val text = tags(List(20) { at(home) }).joinToString { "${it.fact} ${it.withheld}" }
+        assertFalse(text.contains("37.") || text.contains("126.")) // 좌표는 어디에도 없다
+    }
+
+    // ---------- 상황 (T017) ----------
+    private fun withP(idx: Int, p: Boolean) = drive(idx).copy(passenger = p)
+
+    @Test fun passengerExamples() {
+        val a = tag(List(3) { withP(100, false) } + List(3) { withP(70, true) }, TagId.PASSENGER)
+        assertEquals("동승 맞춤형", a.name); assertEquals("동승 운전 3번의 역동성 지수가 평소보다 30% 낮아요", a.fact)
+        val b = tag(List(3) { withP(100, false) } + List(3) { withP(97, true) }, TagId.PASSENGER)
+        assertEquals("동승 한결형", b.name); assertEquals("동승 운전 3번의 역동성 지수가 평소와 비슷해요(차이 3%)", b.fact)
+        val mid = tag(List(3) { withP(100, false) } + List(3) { withP(82, true) }, TagId.PASSENGER)
+        assertNull(mid.value); assertEquals("평소와 차이가 애매해요(차이 18%)", mid.withheld)
+        assertEquals("동승 운전 3번의 역동성 지수가 평소보다 18% 낮아요", mid.fact)
+    }
+
+    @Test fun zeroBaselineAndMinimums() {
+        val same = tag(List(3) { withP(0, false) } + List(3) { withP(0, true) }, TagId.PASSENGER)
+        assertEquals("동승 한결형", same.name); assertEquals("동승 운전 3번의 역동성 지수가 평소와 같아요", same.fact)
+        val inf = tag(List(3) { withP(0, false) } + List(3) { withP(5, true) }, TagId.PASSENGER)
+        assertEquals("동승 맞춤형", inf.name); assertEquals("평소엔 급한 조작이 없었는데 동승 운전 3번에선 있었어요", inf.fact)
+        val short = tag(List(1) { withP(100, false) } + List(2) { withP(70, true) }, TagId.PASSENGER)
+        assertEquals("동승 운전이 2번뿐이에요(3번 필요)", short.withheld) // 상황 집단 먼저
+        val alone = tag(List(2) { withP(100, false) } + List(3) { withP(70, true) }, TagId.PASSENGER)
+        assertEquals("혼자 운전이 2번뿐이에요(3번 필요)", alone.withheld)
+        val noSpeed = List(3) { withP(100, false) } + List(3) { withP(70, true).copy(hardAccel = null) } // 속도 없는 운전은 빠진다
+        assertEquals("동승 운전이 0번뿐이에요(3번 필요)", tag(noSpeed, TagId.PASSENGER).withheld)
+    }
+
+    @Test fun rainUsesWiperTime() {
+        fun w(idx: Int, ms: Long) = drive(idx).copy(wiperMs = ms)
+        val a = tag(List(3) { w(100, 0) } + List(3) { w(70, 3 * MINUTE) }, TagId.RAIN)
+        assertEquals("빗길 맞춤형", a.name); assertEquals("비 운전 3번의 역동성 지수가 평소보다 30% 낮아요", a.fact)
+        val brief = tag(List(3) { w(100, 0) } + List(3) { w(70, 3 * MINUTE - 1) }, TagId.RAIN) // 3분 미만은 비가 아님
+        assertEquals("비 운전이 0번뿐이에요(3번 필요)", brief.withheld)
+        assertEquals("맑은 운전이 1번뿐이에요(3번 필요)", tag(listOf(w(100, 0)) + List(3) { w(70, 4 * MINUTE) }, TagId.RAIN).withheld)
+    }
+
+    @Test fun demoLimitsAreLower() {
+        val d = Limits.DEMO
+        val shortLong = Metrics(durationMs = 2 * MINUTE, km = 1.2, movingMs = 2 * MINUTE, hardAccel = 0, cruiseMs = MINUTE, analyzed = true) // 시속 36km, 2분
+        assertEquals("크루즈 위임형", Tags.all(List(3) { shortLong.copy(cruiseMs = 90_000) }, d).single { it.id == TagId.CRUISE }.name)
+        assertEquals(5, d.rangeMin); assertEquals(2, d.situMin); assertEquals(30_000L, d.rainMs)
+    }
 }

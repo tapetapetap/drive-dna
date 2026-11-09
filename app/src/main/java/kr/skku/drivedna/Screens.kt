@@ -125,19 +125,49 @@ fun Ui.types(mine: String?, current: String?, onClose: () -> Unit): View {
     )
 }
 
+/** 보조 태그 화면(specs/002-tags contracts/ui.md): 태그마다 카드 한 장. 위치는 비율만 */
+fun Ui.tags(list: List<Tag>, onClose: () -> Unit): View {
+    val close = chip("✕  닫기", R.color.text2, R.color.chip).apply { setOnClickListener { onClose() } }
+    val cards = list.map { t ->
+        val badge = t.name?.let { chip(it, R.color.green, R.color.green_soft) } ?: chip("보류", R.color.text3, R.color.chip)
+        card(row(16, text(t.id.title, 28f, R.color.text1, 700), badge, grow = 0),
+            *listOfNotNull(
+                t.fact?.let { body(it) },
+                t.withheld?.let { why ->
+                    text(why, 22f, R.color.text3).apply {
+                        background = round(c(R.color.card), 18f, c(R.color.line), 2f, dash = 6f, gap = 4f)
+                        setPadding(px(20), px(14), px(20), px(14))
+                    }
+                },
+            ).toTypedArray(), gap = 12)
+    }
+    return column(24,
+        row(20, column(6, small("쌓인 운전으로 정해요 · 최근 100번"), headline("보조 태그", 44f)), close, grow = 0),
+        *cards.toTypedArray(),
+        small("태그는 쌓인 운전으로 정하는 잠정 판정이에요. 성향에 좋고 나쁨은 없어요."),
+    )
+}
+
 /** 나의 DNA 칸. 주행 중에는 버튼이 흐리고 눌리지 않는다 */
-fun Ui.profile(p: Profile, driving: Boolean, onHistory: () -> Unit, onTypes: () -> Unit): View {
+fun Ui.profile(p: Profile, tags: List<Tag>, driving: Boolean, onHistory: () -> Unit, onTypes: () -> Unit, onTags: () -> Unit): View {
     val head = column(4, small("나의 DRIVE DNA"),
         text(if (p.drives == 0) "운전이 끝나면 여기에 쌓여요" else "운전 ${p.drives}번 기준", 22f, R.color.text3))
     val type = if (p.drives == 0) null else column(2, text(p.code, 56f, R.color.text1, 700), text(Types.alias(p.code), 26f, R.color.text1, 600))
+    val judged = tags.mapNotNull { it.name }
+    val tagLine = when {
+        judged.isNotEmpty() -> grid(2, judged.map { chip(it, R.color.green, R.color.green_soft).apply { gravity = Gravity.CENTER } })
+        p.drives > 0 -> text("보조 태그는 운전이 더 쌓이면 보여요", 20f, R.color.text3)
+        else -> null
+    }
     val bars = AxisId.entries.mapIndexed { i, a -> column(2, text(a.title, 20f, R.color.text3), AxisBar(ctx, a, p.values[i], R.color.green)) }
     val chips = listOf(
         chip("운전 기록  ›", R.color.blue, R.color.blue_soft, R.drawable.ic_list).apply { setOnClickListener { onHistory() } },
         chip("16유형  ›", R.color.blue, R.color.blue_soft, R.drawable.ic_grid).apply { setOnClickListener { onTypes() } },
+        chip("태그  ›", R.color.blue, R.color.blue_soft, R.drawable.ic_dna).apply { setOnClickListener { onTags() } },
     ).onEach { it.isEnabled = !driving; it.alpha = if (driving) 0.4f else 1f } // 비활성 뷰는 덤프에 enabled="false"
     val buttons = row(12, *chips.toTypedArray())
     // 세로 화면의 아래 칸은 낮아서, 버튼을 맨 아래에 두면 스크롤해야 보인다. 그때는 머리 바로 밑에 둔다
     if (ctx.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT)
-        return column(24, head, buttons, *listOfNotNull(type).toTypedArray(), *bars.toTypedArray())
-    return column(24, *listOfNotNull(head, type).toTypedArray(), *bars.toTypedArray(), buttons)
+        return column(24, head, buttons, *listOfNotNull(type, tagLine).toTypedArray(), *bars.toTypedArray())
+    return column(24, *listOfNotNull(head, type, tagLine).toTypedArray(), *bars.toTypedArray(), buttons)
 }

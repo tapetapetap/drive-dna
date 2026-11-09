@@ -25,6 +25,7 @@ android {
 dependencies {
     implementation(libs.pleos.vehicle)
     implementation(libs.pleos.tts)
+    implementation(libs.pleos.location)
     implementation(libs.androidx.core.ktx)
     testImplementation(libs.junit)
 }

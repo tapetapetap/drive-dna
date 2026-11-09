@@ -60,10 +60,11 @@ class Ui(val ctx: Context) {
     fun headline(s: String, sp: Float = 48f) = text(s, sp, R.color.text1, 700)
     fun body(s: String, sp: Float = 26f) = text(s, sp, R.color.text2)
 
-    fun round(fill: Int, radius: Float, line: Int = 0, width: Float = 1.5f) = GradientDrawable().apply {
+    /** [dash]가 0보다 크면 점선 테두리(dp) */
+    fun round(fill: Int, radius: Float, line: Int = 0, width: Float = 1.5f, dash: Float = 0f, gap: Float = 0f) = GradientDrawable().apply {
         setColor(fill)
         cornerRadius = radius * density
-        if (line != 0) setStroke(px(width), line)
+        if (line != 0) setStroke(px(width), line, dash * density, gap * density)
     }
 
     fun dot(color: Int, size: Int = 12) = View(ctx).apply {

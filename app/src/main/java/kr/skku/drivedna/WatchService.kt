@@ -98,7 +98,7 @@ class WatchService : Service() {
     private fun onDriveEnd(raw: Metrics) {
         val l = limits()
         val m = raw.copy(endedAt = System.currentTimeMillis(), analyzed = Judge.analyzed(raw, l))
-        Log.i(TAG, "운전 끝: $m")
+        Log.i(TAG, "운전 끝: ${m.logLine()}")
         records.add(m)
         if (!m.analyzed) return
         val code = Judge.code(m, l)
