@@ -41,6 +41,7 @@ python3 scripts/demo.py dynamic         # 역동적인 운전(약 1분) → DRFC
 python3 scripts/demo.py city            # 시내 운전(약 2분 10초) → GPFE 유연한 길잡이
 python3 scripts/demo.py straight        # 회전 없는 운전(약 2분) → G·SE, 대응 방식 판정 보류
 python3 scripts/demo.py short           # 15초 운전 → "짧은 운전은 분석하지 않아요"
+python3 scripts/demo.py tour            # 전체 연속 시연(약 10분): reset → 위 다섯 개, 사이사이 결과·기록·다시 보기·16유형 화면을 자동으로 넘김
 ```
 
 - Virtual Console은 속도를 줘도 주행거리를 늘리지 않습니다. 그래서 스크립트가 0.2초마다 경과 시간으로 계산한 주행거리를 직접 씁니다. 시나리오는 `scripts/scenarios/<이름>.txt`의 구간표이고, 단위 테스트(`DnaTest`)도 같은 표를 재생해 기대 유형을 지킵니다.
