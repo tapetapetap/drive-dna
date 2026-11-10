@@ -9,6 +9,7 @@
   python3 scripts/demo.py reset     콘솔 신호를 0으로, 배터리 60kWh, 앱 기록 삭제
   python3 scripts/demo.py seed      앱 기록을 샘플 24개로(보조 태그 다섯이 판정됨)
   python3 scripts/demo.py highway   크루즈를 켠 고속도로 운전(약 2분 10초) → 태그 근거가 다시 계산됨
+  python3 scripts/demo.py compare   3차: reset → gentle → dynamic → 운전 기록 → 비교 → 두 줄 → "두 운전 비교"(약 4분)
   python3 scripts/demo.py tour      전체 연속 시연(약 10분): reset → 시나리오 다섯 개, 사이사이 결과·기록·16유형 화면 넘기기
 
 시나리오는 scripts/scenarios/<이름>.txt다(앱 테스트 DnaTest도 같은 파일을 읽는다).
@@ -190,6 +191,19 @@ def scroll(down=True):
     adb("input", "swipe", "2000", "1150" if down else "250", "2000", "250" if down else "1150", "700")
 
 
+def compare():
+    """3차 두 운전 비교(specs/003-drive-graph research R17). 누르기는 tour의 tap을 쓴다"""
+    reset(); time.sleep(4)
+    drive("gentle"); time.sleep(6)
+    drive("dynamic"); time.sleep(6)
+    tap("운전 기록  ›"); time.sleep(3)
+    tap("비교"); time.sleep(2)
+    tap("DRFC · 자유로운 드라이버"); time.sleep(1)
+    tap("GPSE · 차분한 계획가"); time.sleep(1)
+    tap("두 운전 비교"); time.sleep(3)
+    say("비교 화면: 두 유형 카드, 겹친 그래프, 축마다 두 점, '다른 축 n개 · 같은 축 m개'")
+
+
 def tour():
     """전체 연속 시연. P마다 결과를 잠시 보여 주고, 화면을 넘겨 기록·다시 보기·16유형까지 보인다"""
     subprocess.run([ADB, "logcat", "-c"])
@@ -220,5 +234,7 @@ if __name__ == "__main__":
         seed()
     elif sys.argv[1] == "tour":
         tour()
+    elif sys.argv[1] == "compare":
+        compare()
     else:
         drive(sys.argv[1])

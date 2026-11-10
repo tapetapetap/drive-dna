@@ -21,4 +21,11 @@
     <color name="red">#FFFF4C28</color>
     <color name="red_soft">#FF3A1810</color>
     <color name="red_text">#FFFF8A70</color>
+    <!-- 3차 그래프(specs/003-drive-graph data-model §6 색 표) -->
+    <color name="graph_fill">#FF1E3157</color>
+    <color name="graph_line">#FF4D8DFF</color>
+    <color name="graph_line2">#FF3DDC97</color>
+    <color name="mark_accel">#FFFF6B6F</color>
+    <color name="mark_decel">#FFF2A33A</color>
+    <color name="mark_steer">#FFB07CE8</color>
 </resources>

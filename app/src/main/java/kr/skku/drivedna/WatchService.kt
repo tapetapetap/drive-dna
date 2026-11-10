@@ -13,10 +13,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import java.util.Locale
+
+/** 3차: 결과 음성 문장, 말하기 시작한 때(uptimeMillis), 그 운전의 endedAt */
+data class Spoken(val text: String, val at: Long, val endedAt: Long)
 
 /** 운전을 지켜보다 P가 되면 이번 운전을 판정·저장하고, 분석된 운전이면 음성·알림으로 한 번 알린다 */
 class WatchService : Service() {
@@ -44,6 +48,10 @@ class WatchService : Service() {
 
         /** 화면이 열려 있을 때만 설정된다. 주행 상태·연결 문제·기록이 바뀔 때만 부른다 */
         var onUpdate: (() -> Unit)? = null
+
+        /** 3차 자막(data-model §5): 마지막으로 말하려 한 문장. TTS 준비와 상관없이 둔다 */
+        @Volatile var lastSpoken: Spoken? = null
+            private set
 
         fun start(context: Context) =
             ContextCompat.startForegroundService(context, Intent(context, WatchService::class.java))
@@ -103,6 +111,7 @@ class WatchService : Service() {
         if (!m.analyzed) return
         val code = Judge.code(m, l)
         val text = Types.speech(code)
+        lastSpoken = Spoken(text, SystemClock.uptimeMillis(), m.endedAt) // speak 안은 TTS가 준비되지 않으면 돌아가므로 그 앞에서
         speak(text)
         getSystemService(NotificationManager::class.java)
             .notify(ID_RESULT, notification(CH_RESULT, "이번 운전 DNA: $code", text, ongoing = false))

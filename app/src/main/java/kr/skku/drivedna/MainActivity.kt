@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -13,7 +14,13 @@ import android.widget.ScrollView
 /** 상황 화면(오른쪽, 세로는 위)과 나의 DNA 칸(왼쪽, 세로는 아래). 상태 우선순위는 data-model §8 */
 class MainActivity : Activity() {
 
-    private enum class State { DRIVING, TYPES, TAGS, RECORD, HISTORY, FIRST, SHORT, RESULT }
+    private enum class State { DRIVING, TYPES, TAGS, COMPARE, RECORD, HISTORY, FIRST, SHORT, RESULT }
+
+    companion object {
+        /** 3차: 공개 효과를 낸 결과의 endedAt과 시작 uptime. 프로세스 범위라 회전·다시 열기에도 한 결과에 한 번이다(위임 결정 D1·D15) */
+        private var animatedAt: Long? = null
+        private var revealAt = 0L
+    }
 
     private lateinit var records: Records
     private lateinit var ui: Ui
@@ -25,6 +32,9 @@ class MainActivity : Activity() {
     private var listY = 0 // 다시 보기로 가기 전 기록 목록의 스크롤 위치
     private var shown: State? = null
     private var seenAt: Long? = null // 마지막 기록의 endedAt. 바뀌면 새 기록
+    // 3차 비교(contracts §2·§3): 켜짐과 고른 운전의 endedAt(고른 차례)
+    private var comparing = false
+    private val picked = mutableListOf<Long>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,6 +64,7 @@ class MainActivity : Activity() {
     override fun onPause() {
         WatchService.onUpdate = null
         page = null; openRecord = null // 가려지는 동안 운전이 있었을 수 있다. 돌아오면 상황 화면부터
+        comparing = false; picked.clear()
         super.onPause()
     }
 
@@ -62,6 +73,7 @@ class MainActivity : Activity() {
     override fun onBackPressed() {
         when {
             openRecord != null -> { openRecord = null; render() }
+            page == State.COMPARE -> open(State.HISTORY) // 비교 모드와 고른 둘은 남는다(위임 결정 D2)
             page != null -> open(null)
             else -> super.onBackPressed()
         }
@@ -71,6 +83,7 @@ class MainActivity : Activity() {
     private fun open(p: State?) {
         if (WatchService.driving) return
         if (p == State.TYPES && page != State.TYPES) typesFor = shownCode // 16유형에서 다시 눌러도 파랑을 지키게
+        if (p == null || p == State.TYPES || p == State.TAGS) { comparing = false; picked.clear() } // 기록 페이지를 떠나면 비교도 끝
         page = p; openRecord = null
         render()
     }
@@ -79,7 +92,7 @@ class MainActivity : Activity() {
         val all = records.all()
         val lastAt = all.lastOrNull()?.endedAt
         // 운전이 시작됐거나 새 기록이 생기면 열린 페이지를 닫는다(결과가 가려지지 않게)
-        if (WatchService.driving || lastAt != seenAt) { page = null; openRecord = null }
+        if (WatchService.driving || lastAt != seenAt) { page = null; openRecord = null; comparing = false; picked.clear() }
         seenAt = lastAt
         val analyzed = all.filter { it.analyzed }.asReversed() // 최신이 앞
         val last = all.lastOrNull()
@@ -88,6 +101,8 @@ class MainActivity : Activity() {
             WatchService.driving -> State.DRIVING
             page == State.TYPES -> State.TYPES
             page == State.TAGS -> State.TAGS
+            page == State.COMPARE && picked.size == 2 && picked.all { at -> analyzed.any { it.endedAt == at } } -> State.COMPARE
+            page == State.COMPARE -> State.HISTORY // 고른 운전이 기록에서 사라졌으면 목록으로(코드 리뷰 반영)
             recordIndex != null -> State.RECORD
             page == State.HISTORY -> State.HISTORY
             last == null -> State.FIRST
@@ -104,26 +119,36 @@ class MainActivity : Activity() {
         if (WatchService.noSignal) screen.addView(ui.banner(NO_SIGNAL), lp(bottom = 28))
         shownCode = null
         val profile = Profile.of(analyzed, limits)
-        val tags = Tags.all(all, limits)
+        val changes = Tags.changes(all, limits) // 3차: 최근 분석 운전으로 바뀐 태그(data-model §4)
+        val tags = changes.map { it.now }
         screen.addView(when (state) {
             State.DRIVING -> ui.driving(WatchService.recording)
             State.TYPES -> ui.types(profile.code.takeIf { profile.drives > 0 }, typesFor) { open(null) }
-            State.TAGS -> ui.tags(tags) { open(null) }
+            State.TAGS -> ui.tags(changes) { open(null) }
+            State.COMPARE -> ui.compare(analyzed.first { it.endedAt == picked[0] }, analyzed.first { it.endedAt == picked[1] }, limits) {
+                open(State.HISTORY)
+            }
             State.RECORD -> resultScreen(analyzed, recordIndex!!)
-            State.HISTORY -> ui.history(analyzed, limits,
-                onOpen = { listY = scroll.scrollY; openRecord = it.endedAt; render() },
-                onClose = { open(null) })
+            State.HISTORY -> ui.history(analyzed, limits, comparing, picked,
+                onOpen = {
+                    if (!comparing) { listY = scroll.scrollY; openRecord = it.endedAt }
+                    else if (!picked.remove(it.endedAt)) { picked += it.endedAt; if (picked.size > 2) picked.removeAt(0) } // 세 번째면 첫 것이 풀린다
+                    render()
+                },
+                onClose = { open(null) },
+                onCompare = { comparing = !comparing; picked.clear(); render() },
+                onGo = { listY = scroll.scrollY; open(State.COMPARE) })
             State.FIRST -> ui.first()
             State.SHORT -> ui.short(last!!, limits)
             State.RESULT -> resultScreen(analyzed, 0)
         }, lp())
         // 다른 화면으로 바뀔 때만 맨 위로. 다시 보기에서 목록으로 돌아오면 보던 자리로
-        if (state == State.HISTORY && prev == State.RECORD) scroll.post { scroll.scrollTo(0, listY) }
+        if (state == State.HISTORY && (prev == State.RECORD || prev == State.COMPARE)) scroll.post { scroll.scrollTo(0, listY) }
         else if (state != prev) scroll.scrollTo(0, 0)
 
         findViewById<LinearLayout>(R.id.dnaPane).apply {
             removeAllViews()
-            addView(ui.profile(profile, tags, WatchService.driving,
+            addView(ui.profile(profile, tags, changes.count { it.change != Change.NONE }, WatchService.driving,
                 onHistory = { open(State.HISTORY) }, onTypes = { open(State.TYPES) }, onTags = { open(State.TAGS) }), lp())
         }
     }
@@ -135,7 +160,15 @@ class MainActivity : Activity() {
         shownCode = Types.code(axes.map { it.value })
         val diff = Profile.difference(axes, Profile.of(analyzed.drop(i + 1), limits))
         val length = "${elapsed(m.durationMs)} · ${m.km.km1()}km"
-        if (openRecord == null) return ui.result(m, axes, diff, "${driveTitle(m.endedAt)} · $length")
+        if (openRecord == null) {
+            // 3차: 끝 시각 10초 안에 처음 그릴 때만 공개 효과, 같은 운전에 말한 문장이 있으면 자막(data-model §5)
+            val now = SystemClock.uptimeMillis()
+            if (System.currentTimeMillis() - m.endedAt < 10_000 && m.endedAt != animatedAt) { animatedAt = m.endedAt; revealAt = now }
+            // 공개 중(1.8초)에 다시 그려도 링은 이어지고 글자는 다시 떠오르지 않는다(코드 리뷰 반영)
+            val reveal = revealAt.takeIf { m.endedAt == animatedAt && now - it < 1_800 }
+            val caption = WatchService.lastSpoken?.takeIf { it.endedAt == m.endedAt }?.let { ui.caption(it.text, it.at + 6_000) }
+            return ui.result(m, axes, diff, "${driveTitle(m.endedAt)} · $length", reveal = reveal, caption = caption)
+        }
         val back = ui.chip("←  운전 기록", R.color.text2, R.color.chip).apply { setOnClickListener { openRecord = null; render() } }
         return ui.result(m, axes, diff, "${dayLabel(m.endedAt)} ${timeOfDay(m.endedAt)} 운전 · $length", ui.row(0, back))
     }

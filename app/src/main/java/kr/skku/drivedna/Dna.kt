@@ -2,6 +2,7 @@ package kr.skku.drivedna
 
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
@@ -36,6 +37,7 @@ data class Metrics(
     val endLon: Double? = null,
     val passenger: Boolean? = null,
     val wiperMs: Long? = null,
+    val graph: Graph? = null, // 3차 운전 그래프(specs/003-drive-graph data-model §1). 1·2차 기록은 null
 ) {
     val avgKmh get() = if (movingMs > 0) km / (movingMs / 3_600_000.0) else 0.0
 
@@ -46,8 +48,32 @@ data class Metrics(
     /** 역동성 지수: 10km당 급가속·급감속·빠른 조향(축과 상황 태그가 같은 값을 본다) */
     val dynIdx get() = per10((hardAccel ?: 0) + (hardDecel ?: 0) + (quickSteers ?: 0))
 
-    /** 로그용 한 줄. 위치는 기기 안 기록에만 두므로 좌표를 빼고 있음/없음만 쓴다(헌법 VI) */
-    fun logLine() = "${copy(endLat = null, endLon = null)} 위치 ${if (endLat != null) "있음" else "없음"}"
+    /** 로그용 한 줄. 위치는 기기 안 기록에만 두므로 좌표를 빼고 있음/없음만 쓴다(헌법 VI). 그래프는 칸 수만 */
+    fun logLine() = "${copy(endLat = null, endLon = null, graph = null)} 그래프 ${graph?.speeds?.size ?: 0}칸 위치 ${if (endLat != null) "있음" else "없음"}"
+}
+
+/** 운전 하나의 속도 흐름(3차 data-model §1). speeds: 칸마다 평균 시속(1~40칸). marks: (종류, 칸) — 'a' 급가속, 'd' 급감속, 's' 빠른 조향 */
+data class Graph(val speeds: List<Int>, val marks: List<Pair<Char, Int>>) {
+    val avg get() = speeds.average()
+    fun count(kind: Char) = marks.count { it.first == kind }
+
+    companion object {
+        const val KINDS = "ads"
+
+        /** 칸 수 = min(40, 운전 초 올림). 칸마다 표본 평균, 빈 칸은 앞 칸 값, 첫 표본 전은 0(research R11). 표본이 없으면 null */
+        fun of(start: Long, end: Long, trace: List<Pair<Long, Double>>, marks: List<Pair<Long, Char>>): Graph? {
+            if (trace.isEmpty()) return null
+            val d = (end - start).coerceAtLeast(1)
+            val n = ceil(d / 1000.0).toInt().coerceIn(1, 40)
+            fun bin(t: Long) = ((t - start) * n / d).toInt().coerceIn(0, n - 1)
+            val sums = DoubleArray(n)
+            val counts = IntArray(n)
+            trace.forEach { (t, v) -> bin(t).let { sums[it] += v; counts[it]++ } }
+            var last = 0
+            val speeds = (0 until n).map { i -> (if (counts[i] > 0) (sums[i] / counts[i]).roundToInt() else last).also { last = it } }
+            return Graph(speeds, marks.map { (t, k) -> k to bin(t) })
+        }
+    }
 }
 
 /**
@@ -103,6 +129,10 @@ class Tracker(private val clock: () -> Long) {
     private val speeds = ArrayDeque<Pair<Long, Double>>()
     private val moving = ArrayList<Double>()
     private val steers = ArrayDeque<Pair<Long, Double>>()
+    // 3차: 운전 중 추정 속도 표본(시각, km/h). ponytail: 약 1초에 하나라 2시간 운전이면 7천 개 안팎(수백 KB).
+    // 아주 긴 운전이 문제가 되면 구간 수를 정한 뒤 초 단위 합으로 바꾼다
+    private val trace = ArrayList<Pair<Long, Double>>()
+    private val marks = ArrayList<Pair<Long, Char>>() // 3차: 급가속 'a'·급감속 'd'·빠른 조향 's'를 센 시각
 
     /** 기어. 운전이 끝나는 순간(P)에만 지표를 돌려준다. 후진 중 핸들 조작은 세지 않는다 */
     fun gear(isParked: Boolean, isReverse: Boolean = false): Metrics? {
@@ -133,14 +163,15 @@ class Tracker(private val clock: () -> Long) {
 
     private fun speed(now: Long, v: Double) {
         kmh = v
+        trace += now to v
         if (v > MOVING_KMH) {
             speeds.lastOrNull()?.let { movingMs += now - it.first }
             moving += v
         }
         speeds.lastOrNull { it.first <= now - 2_000 }?.let { (t, v0) ->
             val a = (v - v0) / 3.6 / ((now - t) / 1000.0) // m/s²
-            if (!inAccel && a >= HARD_ACCEL) { hardAccel++; inAccel = true } else if (inAccel && a < 1.0) inAccel = false
-            if (!inDecel && a <= HARD_DECEL) { hardDecel++; inDecel = true } else if (inDecel && a > -1.0) inDecel = false
+            if (!inAccel && a >= HARD_ACCEL) { hardAccel++; marks += now to 'a'; inAccel = true } else if (inAccel && a < 1.0) inAccel = false
+            if (!inDecel && a <= HARD_DECEL) { hardDecel++; marks += now to 'd'; inDecel = true } else if (inDecel && a > -1.0) inDecel = false
         }
         speeds.addLast(now to v)
         while (speeds.size > 2 && speeds[1].first <= now - 10_000) speeds.removeFirst()
@@ -168,7 +199,7 @@ class Tracker(private val clock: () -> Long) {
         if (inTurn && a < TURN_DEG / 2) inTurn = false
         if (reverse || kmh <= MOVING_KMH) return // 서 있거나 후진하며 돌린 핸들(주차)은 세지 않는다
         val span = steers.maxOf { it.second } - steers.minOf { it.second } // 부호를 넘는 빠른 조향도 잡는다
-        if (span >= QUICK_DEG && lastQuick.let { it == null || now - it > 2_000 }) { quick++; lastQuick = now }
+        if (span >= QUICK_DEG && lastQuick.let { it == null || now - it > 2_000 }) { quick++; marks += now to 's'; lastQuick = now }
         if (!inTurn && a >= TURN_DEG) {
             inTurn = true
             turns++
@@ -216,7 +247,7 @@ class Tracker(private val clock: () -> Long) {
         start = clock()
         km = 0.0; movingMs = 0; hardAccel = 0; hardDecel = 0; brakes = 0; turns = 0; early = 0; quick = 0
         inAccel = false; inDecel = false; inTurn = abs(steerDeg ?: 0.0) >= TURN_DEG; lastQuick = null; kmh = 0.0; coarse = false
-        kmSamples.clear(); speeds.clear(); moving.clear(); steers.clear()
+        kmSamples.clear(); speeds.clear(); moving.clear(); steers.clear(); trace.clear(); marks.clear()
         odo?.let { kmSamples.addLast(start to it) }
         steerDeg?.let { steers.addLast(start to it) }
         batteryStart = battery
@@ -230,10 +261,11 @@ class Tracker(private val clock: () -> Long) {
 
     private fun endDrive(): Metrics {
         driving = false
+        val end = clock()
         val used = batteryStart?.let { s -> battery?.let { s - it } }
         val steer = steerDeg != null
         return Metrics(
-            durationMs = clock() - start,
+            durationMs = end - start,
             km = km,
             movingMs = movingMs,
             hardAccel = hardAccel.takeUnless { coarse },
@@ -244,13 +276,14 @@ class Tracker(private val clock: () -> Long) {
             quickSteers = quick.takeIf { steer },
             speedCv = cv(moving).takeUnless { coarse },
             kwhPer100 = if (used != null && used > 0 && km > 0) used / 1000 / km * 100 else null,
-            cruiseMs = cruise.end(clock()),
+            cruiseMs = cruise.end(end),
             socStart = socStart,
             socEnd = socNow,
             endLat = lat,
             endLon = lon,
             passenger = passenger,
-            wiperMs = wiper.end(clock()),
+            wiperMs = wiper.end(end),
+            graph = if (coarse) null else Graph.of(start, end, trace, marks), // 거친 주행거리면 속도가 잡음이라 없다
         )
     }
 
@@ -456,21 +489,33 @@ object RecordFormat {
         listOf(m.endedAt, m.durationMs, m.km, m.movingMs, m.hardAccel, m.hardDecel, m.brakes, m.turns, m.early,
             m.quickSteers, m.speedCv, m.kwhPer100, if (m.analyzed) 1 else 0,
             m.cruiseMs, m.socStart, m.socEnd, m.endLat, m.endLon, m.passenger?.let { if (it) 1 else 0 }, m.wiperMs,
+            // 3차 20·21번: 속도 칸과 사건, 칸 안 구분자는 "/"(research R12)
+            m.graph?.speeds?.joinToString("/"), m.graph?.marks?.joinToString("/") { "${it.first}${it.second}" },
         ).joinToString(",") { it?.toString() ?: "" }
     }
 
     fun decode(s: String?): List<Metrics> = s.orEmpty().lines().mapNotNull { line ->
         val p = line.split(',')
-        if (p.size != 13 && p.size != 20) return@mapNotNull null // 13칸은 1차 형식
+        if (p.size != 13 && p.size != 20 && p.size != 22) return@mapNotNull null // 13칸은 1차, 20칸은 2차 형식
         fun int(i: Int) = p.getOrNull(i)?.ifEmpty { null }?.toInt()
         fun lng(i: Int) = p.getOrNull(i)?.ifEmpty { null }?.toLong()
         fun dbl(i: Int) = p.getOrNull(i)?.ifEmpty { null }?.toDouble()
         runCatching {
             Metrics(p[0].toLong(), p[1].toLong(), p[2].toDouble(), p[3].toLong(), int(4), int(5),
                 int(6), int(7), int(8), int(9), dbl(10), dbl(11), p[12] == "1",
-                lng(13), int(14), int(15), dbl(16), dbl(17), p.getOrNull(18)?.ifEmpty { null }?.let { it == "1" }, lng(19))
+                lng(13), int(14), int(15), dbl(16), dbl(17), p.getOrNull(18)?.ifEmpty { null }?.let { it == "1" }, lng(19),
+                graph(p.getOrNull(20), p.getOrNull(21)))
         }.getOrNull()
     }
+
+    /** 그래프 칸이 어긋나면 그 줄은 남기고 그래프만 null이다(위임 결정 D10): 화면은 늘 범위 안의 칸만 읽는다 */
+    private fun graph(speeds: String?, marks: String?): Graph? = runCatching {
+        val v = speeds?.ifEmpty { null }?.split('/')?.map { it.toInt() } ?: return null
+        if (v.isEmpty() || v.size > 40) return null
+        val m = marks.orEmpty().ifEmpty { null }?.split('/')?.map { it[0] to it.substring(1).toInt() }.orEmpty()
+        if (m.any { (k, i) -> k !in Graph.KINDS || i !in v.indices }) return null
+        Graph(v, m)
+    }.getOrNull()
 
     /** 오래된 것이 앞. 최신 100개만 남긴다 */
     fun add(old: List<Metrics>, m: Metrics) = (old + m).takeLast(100)
@@ -486,6 +531,23 @@ enum class TagId(val title: String, val left: String, val right: String) {
     PASSENGER("동승", "동승 한결형", "동승 맞춤형"),
     RAIN("빗길", "빗길 한결형", "빗길 맞춤형"),
 }
+
+/** 3차 두 운전 비교(data-model §3) */
+object Compare {
+    /** (다른 축, 같은 축, 보류 축). 보류 축 = 한쪽이라도 보류. 합은 4(위임 결정 D3) */
+    fun counts(a: Metrics, b: Metrics, l: Limits): Triple<Int, Int, Int> {
+        val pairs = Judge.axes(a, l).zip(Judge.axes(b, l))
+        val held = pairs.count { (x, y) -> x.value == null || y.value == null }
+        val diff = pairs.count { (x, y) -> x.value != null && y.value != null && x.letter != y.letter }
+        return Triple(diff, 4 - held - diff, held)
+    }
+}
+
+/** 3차 태그 바뀜(data-model §4): NEW = 새로 정해짐, CHANGED = 방금 운전으로 바뀜 */
+enum class Change { NONE, CHANGED, NEW }
+
+/** before: 지난 문장(지난 fact, 없으면 보류 이유, 전에 없던 태그면 "이전에는 없던 태그"). NONE이면 null */
+data class TagView(val now: Tag, val change: Change, val before: String?)
 
 /** value null = 보류(withheld가 이유). fact = 관측 문장(대상이 최소 수보다 적으면 null) */
 data class Tag(val id: TagId, val value: Boolean?, val fact: String?, val withheld: String?) {
@@ -509,6 +571,34 @@ object Tags {
             situation(TagId.PASSENGER, "동승", "혼자", a, l) { it.passenger },
             situation(TagId.RAIN, "비", "맑은", a, l) { m -> m.wiperMs?.let { it >= l.rainMs } },
         )
+    }
+
+    /**
+     * 가장 최근 분석 운전 앞까지 자른 기록(그 뒤의 짧은 운전도 빠짐, 위임 결정 D5)과 지금 기록의 태그를 견준다.
+     * 분석 운전이 2개 미만이면 모두 NONE이다(위임 결정 D11)
+     */
+    fun changes(oldestFirst: List<Metrics>, l: Limits): List<TagView> {
+        val now = all(oldestFirst, l)
+        if (oldestFirst.count { it.analyzed } < 2) return now.map { TagView(it, Change.NONE, null) }
+        return diff(all(oldestFirst.take(oldestFirst.indexOfLast { it.analyzed }), l), now)
+    }
+
+    /**
+     * 태그마다: 지금 정해졌고 전에 없음·보류·다른 판정이면 NEW, 그 밖에 판정이나 근거 문장(fact)이 다르면 CHANGED.
+     * 보류 이유만 바뀐 것("운전이 2번 쌓였어요" → "3번")은 근거가 아니라 쌓인 수라 NONE이다(구현 중 바뀜, approval-gate)
+     */
+    fun diff(before: List<Tag>, now: List<Tag>): List<TagView> = now.map { t ->
+        val b = before.firstOrNull { it.id == t.id }
+        val change = when {
+            t.value != null && (b == null || b.value != t.value) -> Change.NEW
+            b?.value != t.value || b?.fact != t.fact -> Change.CHANGED
+            else -> Change.NONE
+        }
+        TagView(t, change, when {
+            change == Change.NONE -> null
+            b == null -> "이전에는 없던 태그"
+            else -> b.fact ?: b.withheld
+        })
     }
 
     private fun median(xs: List<Double>) = xs.sorted().let { s -> if (s.size % 2 == 1) s[s.size / 2] else (s[s.size / 2 - 1] + s[s.size / 2]) / 2 }

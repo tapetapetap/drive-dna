@@ -435,12 +435,12 @@ class TagSignalTest {
         assertEquals(66, m.socStart); assertEquals(60, m.socEnd); assertEquals(false, m.passenger)
     }
 
-    @Test fun recordFormatHas20FieldsAndReadsOld13() {
+    @Test fun recordFormatHas22FieldsAndReadsOld13() {
         val a = Metrics(endedAt = 7, durationMs = 60_000, km = 1.0, cruiseMs = 30_000, socStart = 80, socEnd = 72,
             endLat = 37.2839144, endLon = 126.9896135, passenger = true, wiperMs = 0)
         val b = Metrics(endedAt = 8, durationMs = 15_000, km = 0.1) // 새 값 없음
         val text = RecordFormat.encode(listOf(a, b))
-        assertEquals(20, text.lines()[0].split(',').size)
+        assertEquals(22, text.lines()[0].split(',').size) // 3차: 그래프 두 칸(그래프 없는 운전은 빈 칸)
         assertEquals(listOf(a, b), RecordFormat.decode(text))
         val old = "5,15000,0.08,0,0,0,,,,,,,0" // 1차 13칸
         assertEquals(listOf(Metrics(endedAt = 5, durationMs = 15_000, km = 0.08, movingMs = 0)), RecordFormat.decode(old))
