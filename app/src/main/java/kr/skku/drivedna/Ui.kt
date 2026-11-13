@@ -56,7 +56,7 @@ class Ui(val ctx: Context) {
         setLineSpacing(0f, 1.18f)
     }
 
-    fun small(s: String) = text(s, 22f, R.color.text3, 600)
+    fun small(s: String) = text(s, 24f, R.color.text3, 600)
     fun headline(s: String, sp: Float = 48f) = text(s, sp, R.color.text1, 700)
     fun body(s: String, sp: Float = 26f) = text(s, sp, R.color.text2)
 
@@ -119,23 +119,32 @@ class Ui(val ctx: Context) {
         layoutParams = LinearLayout.LayoutParams(px(size), px(size))
     }
 
-    fun chip(label: String, fg: Int, bg: Int, iconRes: Int = 0) = text(label, 20f, fg, 600).apply {
-        background = round(c(bg), 100f)
-        setPadding(px(18), px(9), px(20), px(9))
+    /** 상태 칩(누르지 않음). 4차: 차 기준 24sp */
+    fun chip(label: String, fg: Int, bg: Int, iconRes: Int = 0, line: Int = 0) = text(label, 24f, fg, 600).apply {
+        background = round(c(bg), 100f, if (line != 0) c(line) else 0)
+        setPadding(px(20), px(10), px(22), px(10))
         if (iconRes != 0) {
             val d = ctx.getDrawable(iconRes)!!.mutate()
             d.setTint(c(fg))
-            d.setBounds(0, 0, px(22), px(22))
+            d.setBounds(0, 0, px(26), px(26))
             setCompoundDrawablesRelative(d, null, null, null)
             compoundDrawablePadding = px(8)
         }
+    }
+
+    /** 누르는 칩(4차): 칩 모양에 차 기준 누르는 칸 76dp 이상, 글자 가운데 */
+    fun action(label: String, fg: Int, bg: Int, iconRes: Int = 0, onClick: () -> Unit) = chip(label, fg, bg, iconRes).apply {
+        minHeight = px(76); minWidth = px(76)
+        gravity = Gravity.CENTER
+        setPadding(px(28), 0, px(28), 0)
+        setOnClickListener { onClick() }
     }
 
     /** 아이콘 타일 + 큰 제목 + 아래 글자 */
     fun hero(tile: View, title: String, sub: String?) =
         row(36, tile, column(14, headline(title), *listOfNotNull(sub?.let { body(it) }).toTypedArray()), grow = 1)
 
-    fun banner(text: String) = row(14, dot(R.color.red), text(text, 22f, R.color.red_text, 600), grow = 1).apply {
+    fun banner(text: String) = row(14, dot(R.color.red), text(text, 24f, R.color.red_text, 600), grow = 1).apply {
         background = round(c(R.color.red_soft), 18f, c(R.color.red))
         setPadding(px(24), px(18), px(24), px(18))
     }
