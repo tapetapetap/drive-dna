@@ -59,12 +59,12 @@
 
 - [X] T018 빌드·테스트·설치(quickstart §1)
 - [X] T019 에뮬레이터 확인 quickstart §2~4. 캡처를 `/Users/jiwon/Desktop/현대자동차 공모전/화면 점검 1113/고친 뒤/DRIVE DNA/`에, UI 덤프 크기표를 verification.md에
-- [ ] T020 회귀 quickstart §5: `compare`, `tour`, 시나리오 유형
+- [X] T020 회귀 quickstart §5: `compare`, `tour`, 시나리오 유형
 - [X] T021 `/impeccable audit`·`critique` 다시, 점수를 verification.md에. 남은 P1은 `/impeccable polish`(contracts 범위 안)
 - [X] T022 ponytail-review(`git diff backup/before-car-dna -- app`) 반영
 - [X] T023 `/code-review`(high) 반영, 보안 직접 점검(새 권한·전송·로그 없음)
 - [X] T024 `specs/004-car-screen/verification.md`: SC-017~023, 캡처 경로, 점수 전후, 리뷰 반영
-- [ ] T025 로컬 커밋(브랜치 `car-dna`, 푸시하지 않음)
+- [X] T025 로컬 커밋(브랜치 `car-dna`, 푸시하지 않음)
 
 ## Dependencies & Execution Order
 
