@@ -9,13 +9,15 @@
     <color name="chip">#FFEDEEF2</color>
     <color name="text1">#FF131417</color>
     <color name="text2">#FF3A3C42</color>
-    <color name="text3">#FF6B6E76</color>
+    <color name="text3">#FF62656D</color> <!-- 4차: 회색 칩 바탕에서도 4.5:1 -->
     <color name="text4">#FF8B8F98</color>
     <color name="blue">#FF0064FF</color>
     <color name="blue_dark">#FF0050D8</color>
     <color name="blue_soft">#FFEAF1FF</color>
     <color name="green">#FF02C265</color>
     <color name="green_soft">#FFE3F7EC</color>
+    <color name="green_text">#FF017A40</color> <!-- 4차: 연한 초록 바탕 위 글자 -->
+    <color name="blue_text">#FF0050D8</color> <!-- 4차: 연한 파랑 바탕 위 글자 -->
     <color name="on_accent">#FFFFFFFF</color> <!-- 파랑·초록 바탕 위 글자, 두 테마 같음 -->
     <color name="violet">#FF7B6BFF</color>
     <color name="red">#FFFE3D16</color>

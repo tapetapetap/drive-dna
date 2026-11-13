@@ -16,12 +16,12 @@ class AxisBar(context: Context, private val axis: AxisId, private val value: Dou
               private val second: Double? = null, private val compare: Boolean = false) : View(context) {
     private val d = resources.displayMetrics.density
     private val letters = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 22f, resources.displayMetrics)
+        textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 24f, resources.displayMetrics) // 4차
         typeface = Typeface.create(Typeface.SANS_SERIF, 700, false)
         textAlign = Paint.Align.CENTER
     }
     private val note = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 16f, resources.displayMetrics)
+        textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 20f, resources.displayMetrics) // 4차: 그림 안 글자 20sp
         textAlign = Paint.Align.CENTER
         color = context.getColor(R.color.text3)
     }
@@ -36,7 +36,7 @@ class AxisBar(context: Context, private val axis: AxisId, private val value: Dou
         val baseline = cy - (letters.descent() + letters.ascent()) / 2
         val v = value
         fun letter(ch: Char, x: Float, on: Boolean) {
-            letters.color = context.getColor(if (on && !compare) R.color.text1 else R.color.text4)
+            letters.color = context.getColor(if (on && !compare) R.color.text1 else R.color.text3) // 4차: 꺼진 쪽도 4.5:1
             canvas.drawText(ch.toString(), x, baseline, letters)
         }
         letter(axis.left, 12 * d, v != null && v < 0)
@@ -65,6 +65,6 @@ class AxisBar(context: Context, private val axis: AxisId, private val value: Dou
                 dot.style = Paint.Style.FILL
             }
         }
-        if (value == null || second == null) canvas.drawText("보류", (start + end) / 2, cy + 30 * d, note)
+        if (value == null || second == null) canvas.drawText("보류", (start + end) / 2, cy + 34 * d, note) // 4차: 20sp라 원과 닿지 않게 4dp 아래
     }
 }

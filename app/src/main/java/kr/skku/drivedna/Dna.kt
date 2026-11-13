@@ -14,6 +14,7 @@ fun Double.one() = String.format(Locale.US, "%.1f", this)
 /** 거리 글자: 소수 1자리 내림(보류 이유의 거리가 기준보다 커 보이지 않게, contracts 숫자 형식) */
 fun Double.km1() = (floor(this * 10) / 10).one()
 
+
 /** 운전 하나의 관측 지표(data-model §2). null = 그 신호를 받지 못해 없음 */
 data class Metrics(
     val endedAt: Long = 0,
@@ -364,7 +365,8 @@ private fun Double.clamp() = coerceIn(-1.0, 1.0)
 object Judge {
     fun analyzed(m: Metrics, l: Limits) = m.durationMs >= l.minDriveMs && m.km >= l.minDriveKm
 
-    fun axes(m: Metrics, l: Limits): List<Axis> = listOf(dyn(m, l), res(m, l), rhy(m, l), pur(m, l))
+    /** [rates]가 false면 역동성·전력 줄을 환산 없이 센 수·쓴 양으로 쓴다(두 운전 비교: 두 줄의 단위를 맞춘다) */
+    fun axes(m: Metrics, l: Limits, rates: Boolean = true): List<Axis> = listOf(dyn(m, l, rates), res(m, l), rhy(m, l), pur(m, l, rates))
 
     fun code(m: Metrics, l: Limits) = Types.code(axes(m, l).map { it.value })
 
@@ -372,7 +374,7 @@ object Judge {
 
     private fun shortKm(m: Metrics, l: Limits) = if (m.km < l.minAxisKm) "거리가 짧아 판정을 미뤘어요(${m.km.km1()}km)" else null
 
-    private fun dyn(m: Metrics, l: Limits): Axis {
+    private fun dyn(m: Metrics, l: Limits, rates: Boolean): Axis {
         val q = m.quickSteers
         val idx = m.dynIdx
         val why = when {
@@ -381,7 +383,13 @@ object Judge {
             else -> shortKm(m, l)
         }
         val counts = listOfNotNull(m.hardAccel?.let { "급가속 ${it}번" }, m.hardDecel?.let { "급감속 ${it}번" }, q?.let { "빠른 조향 ${it}번" })
-            .joinToString(" · ").ifEmpty { null }?.let { if (why == null) "$it (10km당 ${idx.one()})" else it }
+            .joinToString(" · ").ifEmpty { null }?.let {
+                when { // 4차: 환산은 단위(10km)의 10분의 1 이상일 때만. 더 짧으면 센 수와 거리(contracts §4)
+                    why != null -> it
+                    rates && m.km >= 1.0 -> "$it (10km당 ${idx.one()})"
+                    else -> "${m.km.km1()}km 동안 $it"
+                }
+            }
         val fact = listOfNotNull(counts, m.brakes?.let { "브레이크 ${it}번" }).joinToString(" · ").ifEmpty { null }
         return Axis(AxisId.DYN, if (why == null) ((idx - 3) / 3).clamp() else null, fact, why)
     }
@@ -408,10 +416,16 @@ object Judge {
         return Axis(AxisId.RHY, if (why == null) ((cv!! - 0.35) / 0.25).clamp() else null, fact, why)
     }
 
-    private fun pur(m: Metrics, l: Limits): Axis {
+    private fun pur(m: Metrics, l: Limits, rates: Boolean): Axis {
         val k = m.kwhPer100
         val why = if (k == null) "배터리 사용량을 알 수 없어 판정을 미뤘어요" else shortKm(m, l)
-        return Axis(AxisId.PUR, if (why == null) ((k!! - 16) / 6).clamp() else null, k?.let { "100km당 ${it.one()}kWh를 썼어요" }, why)
+        // 4차(코드 리뷰 반영): 판정한 축은 판정 근거인 100km당 환산을, 미룬 축(짧은 운전)은 쓴 양과 거리를 보인다
+        return Axis(AxisId.PUR, if (why == null) ((k!! - 16) / 6).clamp() else null, k?.let { if (why == null && rates) "100km당 ${it.one()}kWh를 썼어요" else used(it, m.km) }, why)
+    }
+
+    private fun used(kwhPer100: Double, km: Double): String {
+        val kwh = kwhPer100 * km / 100
+        return if (kwh < 0.05) "0.1kWh보다 적게 썼어요(${km.km1()}km)" else "${kwh.one()}kWh를 썼어요(${km.km1()}km)"
     }
 }
 
@@ -466,7 +480,8 @@ data class Profile(val values: List<Double?>, val drives: Int) {
 object Coach {
     const val DEFAULT = "눈에 띄는 급한 조작 없이 운전을 마쳤어요."
 
-    fun line(m: Metrics): String {
+    /** [energy]: 전력 축을 판정했을 때만 전력 환산 문장을 후보로 둔다(미룬 짧은 운전에서 부풀린 100km당을 말하지 않게) */
+    fun line(m: Metrics, energy: Boolean = true): String {
         val t = m.turns ?: 0
         val missed = t - (m.early ?: t)
         val cv = m.speedCv ?: 0.0
@@ -478,7 +493,7 @@ object Coach {
             (if (t >= 2 && m.early != null) missed.toDouble() / t / 0.4 else 0.0) to
                 "큰 회전 ${t}번 중 ${missed}번은 방향지시등을 미리 켜지 않았어요. 회전 2~3초 전에 켜 두면 주변 차가 미리 알 수 있어요.",
             cv / 0.35 to "속도가 자주 오르내렸어요(변동 ${(cv * 100).roundToInt()}%). 흐름이 고른 길에서는 크루즈 컨트롤을 써 볼 수 있어요.",
-            k / 18 to "100km당 ${k.one()}kWh를 썼어요. 가속을 부드럽게 하면 전력을 아낄 수 있어요.",
+            (if (energy) k / 18 else 0.0) to "100km당 ${k.one()}kWh를 썼어요. 가속을 부드럽게 하면 전력을 아낄 수 있어요.",
         ).filter { it.first >= 1.0 }.maxByOrNull { it.first }?.second ?: DEFAULT
     }
 }

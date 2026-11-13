@@ -201,6 +201,26 @@ class JudgeTest {
 
     private fun code(m: Metrics, l: Limits = Limits.RELEASE) = Types.code(Judge.axes(m, l).map { it.value })
 
+    /** 4차 거리 환산 규칙(contracts §4): 단위의 10분의 1보다 짧으면 환산하지 않는다 */
+    @Test fun ratesNeedDistance() {
+        val short = Judge.axes(base.copy(km = 0.6, hardAccel = 3, kwhPer100 = 221.3), Limits.DEMO)
+        assertTrue(short[0].fact!!, short[0].fact!!.startsWith("0.6km 동안 급가속 3번"))
+        assertFalse(short[0].fact!!.contains("10km당"))
+        // 전력: 판정한 축은 100km당(판정 근거), 거리가 짧아 미룬 축은 쓴 양과 거리(코드 리뷰 반영)
+        assertEquals("100km당 221.3kWh를 썼어요", short[3].fact) // 시연 기준(0.3km)으로는 판정함
+        val withheld = Judge.axes(base.copy(km = 0.6, kwhPer100 = 221.3), Limits.RELEASE)[3] // 출시 기준(2km)으로는 미룸
+        assertEquals("1.3kWh를 썼어요(0.6km)", withheld.fact)
+        assertEquals("0.1kWh보다 적게 썼어요(0.6km)", Judge.axes(base.copy(km = 0.6, kwhPer100 = 5.0), Limits.RELEASE)[3].fact)
+        assertEquals(Coach.DEFAULT, Coach.line(base.copy(km = 0.6, kwhPer100 = 221.3), energy = withheld.value != null)) // 미뤘으면 전력 환산 문장 없음
+        val long = base.copy(km = 12.0, kwhPer100 = 30.0)
+        assertTrue(Judge.axes(long, Limits.RELEASE)[0].fact!!.contains("(10km당"))
+        assertEquals("100km당 30.0kWh를 썼어요", Judge.axes(long, Limits.RELEASE)[3].fact)
+        assertTrue(Coach.line(long).startsWith("100km당 30.0kWh"))
+        // 두 운전 비교는 단위를 맞춰 환산 없이
+        assertTrue(Judge.axes(long, Limits.RELEASE, rates = false)[0].fact!!.startsWith("12.0km 동안"))
+        assertEquals("3.6kWh를 썼어요(12.0km)", Judge.axes(long, Limits.RELEASE, rates = false)[3].fact)
+    }
+
     @Test fun lettersFromThresholds() {
         assertEquals("GPSE", code(base))
         assertEquals("DRFC", code(base.copy(hardAccel = 1, hardDecel = 1, early = 1, speedCv = 0.5, kwhPer100 = 20.0)))

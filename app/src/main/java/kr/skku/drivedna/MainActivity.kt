@@ -35,6 +35,7 @@ class MainActivity : Activity() {
     // 3차 비교(contracts §2·§3): 켜짐과 고른 운전의 endedAt(고른 차례)
     private var comparing = false
     private val picked = mutableListOf<Long>()
+    private var restoreY = -1 // 4차: 낮·밤 전환 뒤 첫 그리기에서 돌아갈 스크롤(contracts §6)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,6 +43,14 @@ class MainActivity : Activity() {
         records = Records(this)
         ui = Ui(this)
         limits = limits()
+        // 4차: 낮·밤 전환처럼 다시 만들어질 때 열린 페이지·비교·스크롤을 되살린다. 새 기록이나 주행이면 render가 닫는다
+        savedInstanceState?.let { b ->
+            page = b.getString("page")?.let { runCatching { State.valueOf(it) }.getOrNull() }
+            openRecord = if (b.containsKey("record")) b.getLong("record") else null
+            comparing = b.getBoolean("comparing"); b.getLongArray("picked")?.let { picked += it.toList() }
+            typesFor = b.getString("typesFor"); listY = b.getInt("listY"); restoreY = b.getInt("scrollY", -1)
+            seenAt = if (b.containsKey("seenAt")) b.getLong("seenAt") else null
+        }
         findViewById<View>(R.id.dnaPane).background = GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(getColor(R.color.pane_top), getColor(R.color.pane_bottom)),
         )
@@ -63,9 +72,19 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         WatchService.onUpdate = null
-        page = null; openRecord = null // 가려지는 동안 운전이 있었을 수 있다. 돌아오면 상황 화면부터
-        comparing = false; picked.clear()
+        // 가려지는 동안 운전이 있었을 수 있다. 돌아오면 상황 화면부터. 4차: 낮·밤 전환처럼 다시 만들어지는 중이면 넘긴다
+        if (!isChangingConfigurations) { page = null; openRecord = null; comparing = false; picked.clear() }
         super.onPause()
+    }
+
+    override fun onSaveInstanceState(out: Bundle) {
+        super.onSaveInstanceState(out)
+        page?.let { out.putString("page", it.name) }
+        openRecord?.let { out.putLong("record", it) }
+        out.putBoolean("comparing", comparing); out.putLongArray("picked", picked.toLongArray())
+        out.putString("typesFor", typesFor); out.putInt("listY", listY)
+        out.putInt("scrollY", findViewById<ScrollView>(R.id.scroll).scrollY)
+        seenAt?.let { out.putLong("seenAt", it) }
     }
 
     /** 뒤로 가기: 다시 보기 → 기록 목록 → 페이지 닫기 → 앱 나가기 */
@@ -142,8 +161,10 @@ class MainActivity : Activity() {
             State.SHORT -> ui.short(last!!, limits)
             State.RESULT -> resultScreen(analyzed, 0)
         }, lp())
-        // 다른 화면으로 바뀔 때만 맨 위로. 다시 보기에서 목록으로 돌아오면 보던 자리로
-        if (state == State.HISTORY && (prev == State.RECORD || prev == State.COMPARE)) scroll.post { scroll.scrollTo(0, listY) }
+        // 다른 화면으로 바뀔 때만 맨 위로. 다시 보기에서 목록으로 돌아오면 보던 자리로. 4차: 다시 만들어진 뒤 첫 그리기는 그 스크롤로
+        val y = restoreY.also { restoreY = -1 }
+        if (y >= 0 && (page != null || openRecord != null)) scroll.post { scroll.scrollTo(0, y) }
+        else if (state == State.HISTORY && (prev == State.RECORD || prev == State.COMPARE)) scroll.post { scroll.scrollTo(0, listY) }
         else if (state != prev) scroll.scrollTo(0, 0)
 
         findViewById<LinearLayout>(R.id.dnaPane).apply {
@@ -169,7 +190,7 @@ class MainActivity : Activity() {
             val caption = WatchService.lastSpoken?.takeIf { it.endedAt == m.endedAt }?.let { ui.caption(it.text, it.at + 6_000) }
             return ui.result(m, axes, diff, "${driveTitle(m.endedAt)} · $length", reveal = reveal, caption = caption)
         }
-        val back = ui.chip("←  운전 기록", R.color.text2, R.color.chip).apply { setOnClickListener { openRecord = null; render() } }
+        val back = ui.action("←  운전 기록", R.color.text2, R.color.chip) { openRecord = null; render() }
         return ui.result(m, axes, diff, "${dayLabel(m.endedAt)} ${timeOfDay(m.endedAt)} 운전 · $length", ui.row(0, back))
     }
 
