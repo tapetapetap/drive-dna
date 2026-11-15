@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DRIVE DNA 시연. Virtual Console HTTP(127.0.0.1:8088, adb forward 필요)로 운전을 흉내 낸다.
+"""자BTI 시연. Virtual Console HTTP(127.0.0.1:8088, adb forward 필요)로 운전을 흉내 낸다.
 
   python3 scripts/demo.py gentle    부드러운 운전 → GPSE (약 2분 15초)
   python3 scripts/demo.py dynamic   역동적인 운전 → DRFC (약 1분)
@@ -171,7 +171,7 @@ def seed():
     adb("am", "force-stop", "--user", "10", APP)
     adb("run-as", APP, "--user", "10", "sh", "-c", "'mkdir -p shared_prefs && cp /data/local/tmp/records.xml shared_prefs/records.xml'")
     adb("am", "start", "--user", "10", "-n", APP + "/.MainActivity")
-    say("샘플 기록 24개를 넣었어요. 나의 DNA 칸에 보조 태그 칩, '태그 ›'를 누르면 태그 화면")
+    say("샘플 기록 24개를 넣었어요. 나의 자BTI 칸에 보조 태그 칩, '태그 ›'를 누르면 태그 화면")
 
 
 def tap(text):
