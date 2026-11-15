@@ -6,6 +6,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** 3차 운전 그래프(specs/003-drive-graph data-model §1·§2, research R11·R12) */
 class GraphTest {
@@ -132,7 +134,6 @@ class TagChangeTest {
         assertTrue(Tags.changes(listOf(drive(1, analyzed = false)), l).all { it.change == Change.NONE })
     }
 
-    private val seed = RecordFormat.decode(File("../scripts/seed.txt").readText())
 
     @Test fun highwayAfterSeedChangesCruiseAndCharge() { // SC-014
         val now = seed + drive(seed.last().endedAt + 3_600_000)
@@ -148,15 +149,35 @@ class TagChangeTest {
     }
 }
 
-/** 3차 샘플 기록 그래프(research R17, FR-042) */
+private val seed = RecordFormat.decode(File("../scripts/seed.txt").readText())
+
+/** 3차 샘플 기록 그래프(research R17, FR-042). 5차: 칸 40개, 사건 칸 방향, 줄마다 다른 모양(specs/005-demo-pictures research R2) */
 class SeedGraphTest {
+
     @Test fun everySeedLineHasAMatchingGraph() {
-        val seed = RecordFormat.decode(File("../scripts/seed.txt").readText())
         assertEquals(24, seed.size)
-        seed.forEach { m ->
+        seed.forEachIndexed { n, m ->
             val g = m.graph!!
+            assertEquals(40, g.speeds.size)
             assertEquals(1.0, g.avg / m.avgKmh, 0.1)
             assertEquals(listOf(m.hardAccel, m.hardDecel, m.quickSteers), listOf(g.count('a'), g.count('d'), g.count('s')))
+            val s = g.speeds
+            fun rise(i: Int) = s[i] - s.getOrElse(i - 1) { 0 } // 첫 칸은 0과 비교
+            for ((k, i) in g.marks) assertTrue("${n + 1}번 줄 $k$i", when (k) { 'a' -> rise(i) > 0; 'd' -> rise(i) < 0; else -> true }) // 급가속은 오르는 칸, 급감속은 내리는 칸
+            if (m.hardAccel!! > 0) assertTrue("${n + 1}번 줄 가장 크게 오른 칸에 급가속이 없다", 'a' to s.indices.maxBy { rise(it) } in g.marks) // 코드 리뷰: 고속 진입처럼 크게 오른 칸이 비면 안 된다
+            // FR-056: 출발·도착 3~12km/h, 크루즈 운전은 크루즈 비율만큼 100~108km/h 칸, 아니면 신호 대기(0~5km/h 칸 묶음) 2~4번
+            assertTrue("${n + 1}번 줄 출발·도착 ${s.first()}·${s.last()}", s.first() in 3..12 && s.last() in 3..12)
+            val cruise = m.cruiseMs ?: 0L
+            if (cruise > 0) assertTrue("${n + 1}번 줄 고속 칸", s.count { it in 100..108 } >= (40.0 * cruise / m.durationMs).roundToInt() - 2)
+            else assertTrue("${n + 1}번 줄 신호 대기", (1..38).count { s[it] <= 5 && s[it - 1] > 5 } in 2..4)
         }
+    }
+
+    /** 평균으로 나눈 칸 값이 어느 두 줄이든 평균 0.03 이상 다르고(같은 물결을 늘이거나 줄인 것도 같은 모양), 9칸 주기 줄이 없다. 두 실패가 함께 보이게 모아서 한 번에 판정한다 */
+    @Test fun seedGraphsDiffer() {
+        val shapes = seed.map { m -> m.graph!!.speeds.let { v -> v.average().let { a -> v.map { it / a } } } }
+        val alike = shapes.indices.flatMap { j -> (0 until j).filter { i -> shapes[i].zip(shapes[j]) { a, b -> abs(a - b) }.average() < 0.03 }.map { "${it + 1}·${j + 1}" } }
+        val cycled = seed.indices.filter { n -> seed[n].graph!!.speeds.let { s -> (4..26).all { s[it] == s[it + 9] } } }.map { it + 1 }
+        assertTrue("같은 모양 ${alike.size}쌍 $alike · 9칸 주기 ${cycled.size}줄 $cycled", alike.isEmpty() && cycled.isEmpty())
     }
 }
