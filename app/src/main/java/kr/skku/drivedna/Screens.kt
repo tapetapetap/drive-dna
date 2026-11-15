@@ -124,7 +124,7 @@ private fun Ui.graphCard(m: Metrics): View {
         GraphView(ctx, GraphView.Mode.RESULT, g),
         text("처음 ${timeOfDay(m.endedAt - m.durationMs)} · 끝 ${timeOfDay(m.endedAt)}", 24f, R.color.text3),
         text(events(m), 24f, R.color.text2),
-        text("속도는 주행거리로 추정했어요", 24f, R.color.text3),
+        text("점선은 평균 속도(정차 포함) · 속도는 주행거리로 추정했어요", 24f, R.color.text3),
     )
 }
 
@@ -311,7 +311,9 @@ fun Ui.profile(p: Profile, tags: List<Tag>, changed: Int, driving: Boolean, onHi
     }
     // 4차: 막대 위 이름으로 오른쪽 결과의 "이번 운전 네 축"과 구분한다(분석된 운전이 없으면 이름 없이 점선 막대만)
     val barsName = if (p.drives == 0) null else small("최근 운전 ${p.drives}번 평균")
-    val bars = AxisId.entries.mapIndexed { i, a -> column(2, text(a.title, 24f, R.color.text3), AxisBar(ctx, a, p.values[i], R.color.green)) }
+    // 5차: 막대 아래 양 끝 뜻(왼쪽 단어가 남은 폭을 차지해 오른쪽 단어가 오른쪽 끝에 붙는다)
+    val bars = AxisId.entries.mapIndexed { i, a -> column(2, text(a.title, 24f, R.color.text3), AxisBar(ctx, a, p.values[i], R.color.green),
+        row(0, text(a.leftName, 24f, R.color.text3), text(a.rightName, 24f, R.color.text3), grow = 0)) }
     val buttons = listOf(
         action("운전 기록  ›", R.color.blue_text, R.color.blue_soft, R.drawable.ic_list, onHistory),
         action("16유형  ›", R.color.blue_text, R.color.blue_soft, R.drawable.ic_grid, onTypes),
