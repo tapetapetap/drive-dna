@@ -29,11 +29,11 @@ fun Ui.first(): View {
         setPadding(px(28), px(24), px(28), px(24))
     }
     return column(28,
-        small("DRIVE DNA"),
+        small("자BTI"),
         hero(tile(R.drawable.ic_dna, Tile.VIOLET), "운전이 끝나면\n이번 운전의 성향을\n보여 드려요", null),
         step(1, R.color.blue, R.color.on_accent, "평소처럼 운전하세요", "브레이크·핸들·방향지시등·속도·전력 신호를 지켜봐요"),
-        step(2, R.color.blue, R.color.on_accent, "P에 놓으면 이번 운전 DNA", "네 가지 축과 근거, 코칭 한 줄"),
-        step(3, R.color.green_soft, R.color.green_text, "쌓일수록 나의 DNA", "기록은 이 차 안에만 남아요"),
+        step(2, R.color.blue, R.color.on_accent, "P에 놓으면 이번 운전 유형", "네 가지 축과 근거, 코칭 한 줄"),
+        step(3, R.color.green_soft, R.color.green_text, "쌓일수록 나의 자BTI", "기록은 이 차 안에만 남아요"),
     )
 }
 
@@ -41,7 +41,7 @@ fun Ui.first(): View {
 fun Ui.driving(recording: Boolean): View = column(32,
     row(0, tile(R.drawable.ic_wheel, Tile.SOFT, 150)),
     headline("운전 중이에요", 60f),
-    body(if (recording) "운전이 끝나면 이번 운전 DNA를 보여 드릴게요." else "이번 운전은 기록하지 않아요. 다음 운전부터 지켜볼게요.", 30f),
+    body(if (recording) "운전이 끝나면 이번 운전 유형을 보여 드릴게요." else "이번 운전은 기록하지 않아요. 다음 운전부터 지켜볼게요.", 30f),
     row(0, row(14, dot(R.color.green, 14), text("주행 중에는 말하지도, 화면을 바꾸지도 않아요", 24f, R.color.text3)).apply {
         background = round(c(R.color.card), 18f, c(R.color.line))
         setPadding(px(24), px(18), px(28), px(18))
@@ -139,7 +139,7 @@ fun Ui.caption(spoken: String, until: Long): View = row(14,
 fun Ui.short(m: Metrics, l: Limits): View = column(28,
     small("${driveTitle(m.endedAt)} · ${elapsed(m.durationMs)}"),
     hero(tile(R.drawable.ic_clock, Tile.GREY), "짧은 운전은\n분석하지 않아요",
-        "${elapsed(l.minDriveMs)}, ${l.minDriveKm.toString().removeSuffix(".0")}km 넘게 달리면 이번 운전 DNA를 보여 드려요."),
+        "${elapsed(l.minDriveMs)}, ${l.minDriveKm.toString().removeSuffix(".0")}km 넘게 달리면 이번 운전 유형을 보여 드려요."),
 )
 
 /** 운전 기록: 분석된 운전, 최신이 위. 날짜가 바뀌면 머리. 3차: 줄 왼쪽 썸네일, "비교" 고르기(contracts §2) */
@@ -254,10 +254,10 @@ fun Ui.types(mine: String?, current: String?, onClose: () -> Unit): View {
     }
     fun key(color: Int, label: String) = row(10, dot(color, 14), text(label, 24f, R.color.text3))
     return column(24,
-        row(20, column(6, small("유형 표"), headline("16가지 DRIVE DNA", 44f)), close, grow = 0),
+        row(20, column(6, small("유형 표"), headline("16가지 자BTI", 44f)), close, grow = 0),
         legend,
         grid(4, cells),
-        row(28, key(R.color.green, "나의 DNA"), key(R.color.blue, "이번 운전")),
+        row(28, key(R.color.green, "나의 자BTI"), key(R.color.blue, "이번 운전")),
     )
 }
 
@@ -294,7 +294,7 @@ fun Ui.tags(list: List<TagView>, onClose: () -> Unit): View {
 
 /** 나의 DNA 칸. 주행 중에는 버튼이 흐리고 눌리지 않는다 */
 fun Ui.profile(p: Profile, tags: List<Tag>, changed: Int, driving: Boolean, onHistory: () -> Unit, onTypes: () -> Unit, onTags: () -> Unit): View {
-    val head = column(4, small("나의 DRIVE DNA"),
+    val head = column(4, small("나의 자BTI"),
         text(if (p.drives == 0) "운전이 끝나면 여기에 쌓여요" else "운전 ${p.drives}번 기준", 24f, R.color.text3))
     val type = if (p.drives == 0) null else column(2, text(p.code, 56f, R.color.text1, 700), text(Types.alias(p.code), 26f, R.color.text1, 600))
     val judged = tags.mapNotNull { it.name }

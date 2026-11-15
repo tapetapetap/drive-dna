@@ -269,7 +269,7 @@ class TypesProfileCoachTest {
         assertTrue(Types.matches("GP·E", "GPFE"))
         assertFalse(Types.matches("GP·E", "GRSE"))
         assertEquals("이번 운전은 G P S E, 차분한 계획가 쪽이었어요. 근거는 화면에서 볼 수 있어요.", Types.speech("GPSE"))
-        assertEquals("이번 운전 DNA가 나왔어요. 2개 축은 판정을 미뤘어요. 근거는 화면에서 볼 수 있어요.", Types.speech("G··E"))
+        assertEquals("이번 운전 유형이 나왔어요. 2개 축은 판정을 미뤘어요. 근거는 화면에서 볼 수 있어요.", Types.speech("G··E"))
     }
 
     private fun m(cv: Double, kwh: Double) = Metrics(durationMs = 10 * MINUTE, km = 5.0, movingMs = 9 * MINUTE,

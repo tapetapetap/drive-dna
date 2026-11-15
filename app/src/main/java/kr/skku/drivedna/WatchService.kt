@@ -69,10 +69,10 @@ class WatchService : Service() {
         records = Records(this)
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CH_WATCH, "운전 지켜보기", NotificationManager.IMPORTANCE_MIN))
-        nm.createNotificationChannel(NotificationChannel(CH_RESULT, "이번 운전 DNA", NotificationManager.IMPORTANCE_HIGH))
+        nm.createNotificationChannel(NotificationChannel(CH_RESULT, "이번 운전 유형", NotificationManager.IMPORTANCE_HIGH))
         ServiceCompat.startForeground(
             this, ID_WATCH,
-            notification(CH_WATCH, "운전을 지켜보는 중", "운전이 끝나면 이번 운전 DNA를 보여 드려요.", ongoing = true),
+            notification(CH_WATCH, "운전을 지켜보는 중", "운전이 끝나면 이번 운전 유형을 보여 드려요.", ongoing = true),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
         )
         startTts()
@@ -114,7 +114,7 @@ class WatchService : Service() {
         lastSpoken = Spoken(text, SystemClock.uptimeMillis(), m.endedAt) // speak 안은 TTS가 준비되지 않으면 돌아가므로 그 앞에서
         speak(text)
         getSystemService(NotificationManager::class.java)
-            .notify(ID_RESULT, notification(CH_RESULT, "이번 운전 DNA: $code", text, ongoing = false))
+            .notify(ID_RESULT, notification(CH_RESULT, "이번 운전 유형: $code", text, ongoing = false))
     }
 
     private fun onNoSignal() {

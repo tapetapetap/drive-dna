@@ -444,7 +444,7 @@ object Types {
     fun alias(code: String) = ALIASES[code] ?: "${code.count { it == '·' }}개 축은 판정 보류"
 
     /** 운전이 끝날 때 한 번 말하는 문장(contracts §8). 코드 글자는 띄어 읽는다 */
-    fun speech(code: String) = if ('·' in code) "이번 운전 DNA가 나왔어요. ${code.count { it == '·' }}개 축은 판정을 미뤘어요. 근거는 화면에서 볼 수 있어요."
+    fun speech(code: String) = if ('·' in code) "이번 운전 유형이 나왔어요. ${code.count { it == '·' }}개 축은 판정을 미뤘어요. 근거는 화면에서 볼 수 있어요."
         else "이번 운전은 ${code.toList().joinToString(" ")}, ${alias(code)} 쪽이었어요. 근거는 화면에서 볼 수 있어요."
 
     /** 보류 축("·")은 어느 글자와도 맞는다 */

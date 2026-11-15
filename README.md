@@ -1,12 +1,31 @@
-# DRIVE DNA
+# 자BTI
 
-운전을 마치고 P에 놓으면, 이번 운전의 성향을 네 글자 유형(예: GPSE 차분한 계획가)으로 보여 주는 Pleos Connect 앱입니다. 차 신호(주행거리, 브레이크, 조향각, 방향지시등, 배터리 잔량)만으로 네 개 축을 판정하고, 축마다 무엇을 보고 그렇게 판단했는지 관측 사실을 먼저 보여 줍니다. 근거가 모자란 축은 억지로 정하지 않고 "·"로 보류합니다. 운전이 쌓이면 최근 10번을 모은 "나의 DNA"와 이번 운전이 평소와 어떻게 달랐는지를 보여 줍니다. 쌓인 기록으로는 크루즈·충전·이동 범위·동승·빗길 보조 태그 다섯 개를 붙입니다.
+운전을 마치고 P에 놓으면, 이번 운전의 성향을 네 글자 유형(예: GPSE 차분한 계획가)으로 보여 주는 Pleos Connect 앱입니다.
 
-![이번 운전 DNA](docs/screenshots/03-result-gentle.png)
+![이번 운전 유형](docs/screenshots/03-result-gentle.png)
 
-처음 쓰는 분은 [사용설명서](사용설명서.md)를 먼저 보세요. 이 README는 빌드·시연·설계 문서를 다룹니다.
+| 제출 항목 | 내용 |
+|---|---|
+| 앱 이름과 한 줄 소개 | **자BTI** · 운전을 마치면 이번 운전의 성향을 네 글자 유형으로, 차 신호에서 본 근거와 함께 보여 줍니다 |
+| 실행 방법 | [2. 실행 방법](#2-실행-방법) |
+| 테스트 환경과 필요한 설정 | [3. 테스트 환경과 필요한 설정](#3-테스트-환경과-필요한-설정) |
+| 개발에 사용한 에뮬레이터 버전과 화면 규격 | Pleos Connect v2.1.0(Android 14, API 34) · 가로 2560×1440, 160dpi |
+| APK 파일 위치 | [`apk/성솦현차해적단_자BTI_release.apk`](apk/성솦현차해적단_자BTI_release.apk) |
 
-## 네 개 축 (잠정 기준)
+처음 쓰는 분은 [사용설명서](사용설명서.md)를 먼저 보세요.
+
+## 1. 앱 이름과 한 줄 소개
+
+- **앱 이름**: 자BTI(자동차의 '자'와 MBTI의 'BTI'를 합친 이름). 저장소와 패키지 이름(`drive-dna`, `kr.skku.drivedna`)은 개발 때 이름(DRIVE DNA)을 그대로 씁니다.
+- **한 줄 소개**: 운전을 마치면 이번 운전의 성향을 네 글자 유형으로, 차 신호에서 본 근거와 함께 보여 주는 Pleos Connect 앱입니다.
+
+차 신호(주행거리, 브레이크, 조향각, 방향지시등, 배터리 잔량)만으로 네 개 축을 판정하고, 축마다 무엇을 보고 그렇게 판단했는지 관측 사실을 먼저 보여 줍니다. 근거가 모자란 축은 억지로 정하지 않고 "·"로 보류합니다. 운전이 쌓이면 최근 10번을 모은 "나의 자BTI"와 이번 운전이 평소와 어떻게 달랐는지를 보여 주고, 쌓인 기록으로 크루즈·충전·이동 범위·동승·빗길 보조 태그 다섯 개를 붙입니다. 좋고 나쁨은 없고, 점수를 매기지 않습니다.
+
+| 운전 그래프 | 두 운전 비교 | 보조 태그 |
+|---|---|---|
+| ![운전 그래프](docs/screenshots/19-result-graph.png) | ![두 운전 비교](docs/screenshots/23-compare.png) | ![태그 화면](docs/screenshots/18-tags-screen.png) |
+
+### 네 개 축(잠정 기준)
 
 | 축 | 앞 / 뒤 | 보는 것 |
 |---|---|---|
@@ -17,9 +36,9 @@
 
 기준 수치는 검증 전 잠정값이고, 화면에도 "잠정 기준"이라고 적습니다. 결과는 정차(P)에서만 보여 주고, 주행 중에는 말하지도 화면을 바꾸지도 않습니다. 기록은 차 안에만 100개까지 남습니다. 위치는 운전이 끝난 곳 한 점만 차 안에 두고(이동 범위 태그), 경로는 모으지 않으며 화면에는 비율만 보입니다.
 
-## 보조 태그 (잠정 기준)
+### 보조 태그(잠정 기준)
 
-네 글자 유형은 그대로 두고, 쌓인 기록으로 태그 다섯 개를 정합니다. 결과 화면과 음성은 바뀌지 않고, 나의 DNA 칸의 칩과 P에서 여는 **태그 ›** 화면에만 보입니다. 태그마다 판정, 횟수·비율이 든 근거, 보류 이유가 나옵니다. 근거가 모자라거나 기준 사이면 "보류"입니다.
+네 글자 유형은 그대로 두고, 쌓인 기록으로 태그 다섯 개를 정합니다. 결과 화면과 음성은 바뀌지 않고, 나의 자BTI 칸의 칩과 P에서 여는 **태그 ›** 화면에만 보입니다. 태그마다 판정, 횟수·비율이 든 근거, 보류 이유가 나옵니다. 근거가 모자라거나 기준 사이면 "보류"입니다. 변화의 방향은 판정하지 않습니다.
 
 | 태그 | 앞 / 뒤 | 보는 것 |
 |---|---|---|
@@ -29,38 +48,52 @@
 | 동승 | 동승 한결형 / 동승 맞춤형 | 조수석에 사람이 앉은 채 시작한 운전 3번 이상과 평소의 역동성 지수 차이(10% 이하 / 25% 이상) |
 | 빗길 | 빗길 한결형 / 빗길 맞춤형 | 와이퍼를 3분 넘게 켠 운전 3번 이상과 평소의 차이(기준은 동승과 같음) |
 
-좋고 나쁨은 없고, 변화의 방향은 판정하지 않습니다.
-
-## 3차: 운전 그래프와 비교
+### 결과 화면과 기록
 
 | 기능 | 하는 일 |
 |---|---|
-| 운전 그래프 | 결과 화면 맨 위에 그 운전의 속도 흐름(최대 40칸)과 평균 점선, 급가속 ▲·급감속 ▼·빠른 조향 ◆ 표시를 보입니다. 사건 수는 역동성 근거의 횟수와 같습니다. 최고 시속 숫자는 보이지 않습니다. 운전 기록 줄 왼쪽에는 작은 그래프가 붙습니다(1·2차 기록은 DNA 타일) |
+| 운전 그래프 | 결과 화면 맨 위에 그 운전의 속도 흐름(최대 40칸)과 평균 속도 점선(정차 포함), 급가속 ▲·급감속 ▼·빠른 조향 ◆ 표시를 보입니다. 사건 수는 역동성 근거의 횟수와 같습니다. 최고 시속 숫자는 보이지 않습니다. 운전 기록 줄 왼쪽에는 작은 그래프가 붙습니다 |
+| 나의 자BTI | 최근 10번을 모은 유형과 축 막대 넷을 보입니다. 막대 아래에는 양 끝의 뜻(부드러움/역동적, 예측형/반응형, 안정형/유동형, 효율/편안함)이 붙습니다. 정차 중에는 **운전 기록 ›**(지난 운전 다시 보기), **16유형 ›**(유형 표), **태그 ›**(보조 태그)를 누를 수 있습니다 |
 | 두 운전 비교 | 운전 기록 머리의 **비교**를 켜고 두 줄을 골라 **두 운전 비교**를 누르면, 두 유형 카드(먼저 고른 것 파랑, 다음 초록), 겹친 그래프, 축마다 두 점과 두 근거, "다른 축 n개 · 같은 축 m개"를 보입니다. 우열은 말하지 않습니다 |
-| 눈에 띄는 새 결과 | P에 놓은 지 10초 안에 처음 그리는 결과는 네 글자가 차례로 떠오르고 DNA 타일 둘레로 링이 두 번 퍼집니다(한 결과에 한 번, 움직임 줄이기 설정이면 없음). "한 가지 제안" 아래에 들은 음성 문장이 스피커·소리 막대와 함께 남습니다 |
-| 바뀐 태그 근거 | 방금 운전으로 태그 판정이나 근거 문장이 바뀌면 태그 카드에 "새로 정해짐" 또는 "방금 운전으로 바뀜"과 "지난: …"이 붙고, 나의 DNA 칸에 "방금 운전으로 태그 근거 n개가 바뀌었어요 ›"가 생깁니다 |
+| 눈에 띄는 새 결과 | P에 놓은 지 10초 안에 처음 그리는 결과는 네 글자가 차례로 떠오르고 유형 타일 둘레로 링이 두 번 퍼집니다(한 결과에 한 번, 움직임 줄이기 설정이면 없음). "한 가지 제안" 아래에 들은 음성 문장이 스피커·소리 막대와 함께 남습니다 |
+| 바뀐 태그 근거 | 방금 운전으로 태그 판정이나 근거 문장이 바뀌면 태그 카드에 "새로 정해짐" 또는 "방금 운전으로 바뀜"과 "지난: …"이 붙고, 나의 자BTI 칸에 "방금 운전으로 태그 근거 n개가 바뀌었어요 ›"가 생깁니다 |
 
-기록 한 줄에는 속도 칸과 사건 칸 두 필드가 더 붙습니다(위치는 더 저장하지 않습니다). 1·2차 기록은 그대로 읽습니다.
+## 2. 실행 방법
 
-## 실행 방법
+앱은 주행거리가 늘어나야 운전을 셉니다. 에뮬레이터의 Virtual Console(`127.0.0.1:8088`)은 속도를 줘도 주행거리를 늘리지 않아서, 시연 스크립트가 0.2초마다 경과 시간으로 계산한 주행거리를 직접 씁니다. release APK는 설치해 첫 화면부터 볼 수 있고(2-2), 운전 결과는 시연 스크립트로 재현합니다(2-3).
 
-### 빌드
+### 2-1. 에뮬레이터 준비
+
+Pleos Connect 에뮬레이터는 [공식 안내](https://document.pleos.ai/docs/connect/guide/getting-started/application-development/setup-connect-sdk-emulator)대로 설치합니다.
+
+```bash
+emulator -avd pleos -no-snapshot &      # Cold boot. Quick boot면 차 신호(VHAL)를 못 씁니다. pleos 자리에 만든 AVD 이름
+adb forward tcp:8088 tcp:8088           # Virtual Console. 부팅마다 한 번
+```
+
+### 2-2. release APK로 설치해 보기
+
+```bash
+adb uninstall kr.skku.drivedna          # 디버그 빌드를 깐 적이 있을 때만(서명이 달라 덮어쓸 수 없습니다)
+adb install -r -g apk/성솦현차해적단_자BTI_release.apk
+adb shell am start --user 10 -n kr.skku.drivedna/.MainActivity   # 앱 목록에서 눌러도 됩니다
+```
+
+- 처음에는 운전 기록이 없는 첫 화면이 나옵니다.
+- release 빌드는 실제 차 기준입니다. 3분 넘고 1km 넘게 달린 운전만 분석하고, 축마다 판정에 필요한 양이 더 있습니다(거리 2km, 큰 회전 3번, 움직인 시간 3분). 2분 안팎인 시연 장면은 release 빌드에서 "짧은 운전"으로 끝나므로, 결과 화면은 디버그 빌드로 봅니다(2-3).
+
+### 2-3. 시연 스크립트로 장면 재현(디버그 빌드)
+
+시연 스크립트는 디버그 빌드에서 돕니다. 디버그 빌드는 짧은 운전·보류 기준을 낮추고(30초·0.2km, 축 판정 0.3km·회전 2번), 태그 기준도 낮춥니다(장거리 1분·시속 20km, 와이퍼 30초, 이동 범위 5번, 동승·빗길 2번). `reset`과 `seed`는 `run-as`로 앱 기록을 지우거나 넣으므로 디버그 빌드에서만 됩니다. 시계는 두 빌드 모두 실제 시간입니다.
 
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home)
 export ANDROID_HOME=$HOME/Library/Android/sdk
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
-```
-
-**APK 위치**: 빌드하면 `app/build/outputs/apk/debug/app-debug.apk`가 생깁니다.
-
-### 에뮬레이터에서 시연
-
-```bash
-emulator -avd pleos -no-snapshot &      # Cold boot. Quick boot면 VHAL을 못 씀
+adb uninstall kr.skku.drivedna          # release를 깐 적이 있을 때만
 adb install -r -g app/build/outputs/apk/debug/app-debug.apk
-adb forward tcp:8088 tcp:8088           # Virtual Console
-python3 scripts/demo.py reset           # 첫 앱 정지, 콘솔 신호 0, 배터리 60kWh, 앱 기록 삭제 후 앱 열기
+
+python3 scripts/demo.py reset           # 안 써본 기능 앱 정지(P에서 음성이 겹치지 않게), 콘솔 신호 0, 배터리 60kWh, 앱 기록 삭제 후 앱 열기
 python3 scripts/demo.py gentle          # 부드러운 운전(약 2분 15초) → GPSE 차분한 계획가
 python3 scripts/demo.py dynamic         # 역동적인 운전(약 1분) → DRFC 자유로운 드라이버
 python3 scripts/demo.py city            # 시내 운전(약 2분 10초) → GPFE 유연한 길잡이
@@ -69,33 +102,51 @@ python3 scripts/demo.py short           # 15초 운전 → "짧은 운전은 분
 python3 scripts/demo.py tour            # 전체 연속 시연(약 10분): reset → 위 다섯 개, 사이사이 결과·기록·다시 보기·16유형 화면을 자동으로 넘김
 python3 scripts/demo.py seed            # 보조 태그: 샘플 기록 24개(scripts/seed.txt)를 넣고 앱을 다시 연다 → 칩 다섯, 태그 화면 다섯 판정
 python3 scripts/demo.py highway         # seed 뒤에: 크루즈를 켠 고속 운전(약 2분 10초) → 태그 화면의 크루즈·충전 근거가 이 운전을 포함한 수로 바뀜
-python3 scripts/demo.py compare         # 3차: reset → gentle → dynamic → 운전 기록 → 비교 → 두 줄 → "두 운전 비교"(약 4분)
+python3 scripts/demo.py compare         # reset → gentle → dynamic → 운전 기록 → 비교 → 두 줄 → "두 운전 비교"(약 4분)
 ```
 
-- Virtual Console은 속도를 줘도 주행거리를 늘리지 않습니다. 그래서 스크립트가 0.2초마다 경과 시간으로 계산한 주행거리를 직접 씁니다. 시나리오는 `scripts/scenarios/<이름>.txt`의 구간표이고, 단위 테스트(`DnaTest`)도 같은 표를 재생해 기대 유형을 지킵니다.
-- 기어를 D에 두면 Pleos가 "주행 중에는 사용할 수 없습니다"로 앱을 가립니다. P에 놓는 순간 결과 화면과 음성 한 번이 나옵니다.
-- 브라우저로 `127.0.0.1:8088` 콘솔 페이지를 열어 둔 채 스크립트를 돌리면, 페이지에 남은 상태가 다시 들어갑니다. 스크립트로 시연할 때는 페이지를 닫으세요.
-- 정차 중에는 왼쪽 "나의 DNA" 칸의 **운전 기록 ›**(지난 운전 다시 보기), **16유형 ›**(유형 표), **태그 ›**(보조 태그)를 누를 수 있습니다.
-- 시연 빌드는 태그 기준도 낮춥니다(장거리 1분·시속 20km, 와이퍼 30초, 이동 범위 5번, 동승·빗길 2번).
+- 시나리오는 `scripts/scenarios/<이름>.txt`의 구간표이고, 단위 테스트(`DnaTest`)도 같은 표를 재생해 기대 유형을 지킵니다.
+- 기어를 D에 두면 Pleos가 "주행 중에는 사용할 수 없습니다"로 앱을 가립니다(정차 중에만 보는 앱이라 주행 최적화를 선언하지 않았습니다). P에 놓는 순간 결과 화면과 음성 한 번이 나옵니다.
+- 스크립트로 시연할 때는 콘솔 페이지를 닫습니다. 열어 둔 채 돌리면 페이지에 남은 상태가 다시 들어갑니다.
 
-## 테스트 환경과 설정
+## 3. 테스트 환경과 필요한 설정
 
-- Pleos Connect Emulator v2.1.0(Android API 34), 가로 2560×1440(앱 창 1682×1210)
-- Pleos Vehicle SDK 2.3.2, Pleos TextToSpeech 3.3.1(온디바이스)
-- 권한: `pleos.car.permission.CAR_INFO`·`CAR_DRIVE`·`CAR_LIGHTS`·`CAR_ENERGY`·`CAR_SEATS`·`CAR_WINDOWS`(조회만), `FUSED_LOCATION`(런타임 요청, 끝난 곳 한 점), `TTS_SERVICE`, 알림
-- JDK 17, Gradle 8.11.1, AGP 8.8.2, Kotlin 2.0.21, 시연 스크립트는 Python 3(표준 라이브러리만)
-- 디버그 빌드는 보류·짧은 운전 기준을 낮춥니다(30초·0.2km, 축 판정 0.3km·회전 2번). 출시 빌드는 3분·1km, 축 판정 2km·회전 3번입니다. 시계는 둘 다 실제 시간입니다.
+| 항목 | 값 |
+|---|---|
+| 개발 컴퓨터 | macOS 26(Apple Silicon) |
+| 빌드 도구 | JDK 17, Gradle 8.11.1(래퍼 포함), Android Gradle Plugin 8.8.2, Kotlin 2.0.21 |
+| Android SDK | compileSdk 35, targetSdk 34, minSdk 28 |
+| Pleos SDK | Vehicle 2.3.2, TextToSpeech 3.3.1(온디바이스), FusedLocation 1.1.3 |
+| 권한 | 차 조회 권한 `CAR_INFO`·`CAR_DRIVE`·`CAR_LIGHTS`·`CAR_ENERGY`·`CAR_SEATS`·`CAR_WINDOWS`, `FUSED_LOCATION`(런타임 요청, 운전이 끝난 곳 한 점), `TTS_SERVICE`, 포그라운드 서비스(`specialUse`), 부팅 완료 수신, 알림. 차 제어 권한은 없습니다 |
+| 시연 스크립트 | Python 3(표준 라이브러리만, 3.13에서 확인), adb |
 
-## 문서
+**필요한 설정**
 
-- 기획: `../DRIVE_DNA_자동차_운전성향_보고서.pdf`(공모전 폴더)
-- 설계: `docs/superpowers/specs/2026-11-09-drive-dna-design.md`
-- 보조 태그 설계: `docs/superpowers/specs/2026-11-10-drive-dna-tags-design.md`, 명세·검증: `specs/002-tags/`
-- 3차 설계: `docs/superpowers/specs/2026-11-11-drive-dna-details-design.md`, 명세·검증: `specs/003-drive-graph/`(그래프, 비교, 바뀐 근거, 자막·공개 효과)
-- 명세·계획·작업·검증: `specs/001-drive-dna/`
-  - `spec.md`, `plan.md`, `data-model.md`, `contracts/ui.md`, `research.md`(신호 측정), `quickstart.md`, `tasks.md`
-  - `goldfish-review.md`(설계 문서 리뷰), `approval-gate.md`(구현 전 결정), `verification.md`(에뮬레이터 결과)
-- 화면 캡처: `docs/screenshots/`(첫 실행, 주행 중, 결과, 기록, 다시 보기, 16유형, 보류, 짧은 운전, 다크, 세로, 태그 칩, 태그 화면)
+- **Pleos SDK 저장소**: Pleos Playground Maven(`https://nexus-playground.pleos.ai/repository/maven-releases/`)이 `settings.gradle.kts`에 들어 있습니다. 처음 빌드할 때 인터넷 연결이 필요하고, 따로 넣을 키는 없습니다.
+- **Android SDK 위치**: `ANDROID_HOME`을 지정하거나, Android Studio로 열어 `local.properties`를 만듭니다(저장소에는 없습니다). 시연 스크립트는 `$ANDROID_HOME/platform-tools/adb`를 씁니다.
+- **Cold boot와 콘솔 연결**: 에뮬레이터는 `-no-snapshot`으로 켜고, 부팅마다 `adb forward tcp:8088 tcp:8088`을 합니다.
+- **화면 나누기 뒤 흐림**: 다른 앱으로 1:1 화면 나누기를 풀고 나면, 그 칸에 떴던 이 앱이 P에서도 흐리게 가려진 채 남을 때가 있습니다(에뮬레이터 홈 화면 동작). 그러면 `adb shell am force-stop --user 10 ai.umos.homescreen` 뒤 HOME을 다시 띄웁니다.
+- **단위 테스트**: `./gradlew :app:testDebugUnitTest`
+
+## 4. 개발에 사용한 Pleos Connect 에뮬레이터 버전과 화면 규격
+
+| 항목 | 값 |
+|---|---|
+| 에뮬레이터 | **Pleos Connect v2.1.0**(시스템 이미지 `pleos_car_emulator`, 빌드 `release_connect_v2.1.0`) |
+| Android | 14(API 34), user 빌드, arm64-v8a |
+| 화면 규격 | **가로 2560×1440, 160dpi**(1dp = 1px) |
+| 앱 창 | 1682×1210dp(가로 기본 창). 1:1 화면 나누기 칸(세로로 좁은 칸)에서도 확인했습니다 |
+| 테마 | 낮·밤(다크) 모두 확인했습니다 |
+| 그 밖의 AVD 설정 | Android Emulator 37.2.13.0, 메모리 8GB, GPU host |
+
+## 5. APK 파일 위치
+
+| 빌드 | 위치 | 쓰임 |
+|---|---|---|
+| release | [`apk/성솦현차해적단_자BTI_release.apk`](apk/성솦현차해적단_자BTI_release.apk) | 설치해 보기(2-2). 실제 차 기준(3분·1km 이상 운전만 분석) |
+| debug | `app/build/outputs/apk/debug/app-debug.apk`(빌드하면 생기고, 저장소에는 없습니다) | 시연 스크립트(2-3) |
+
+- release APK는 팀 서명 키(저장소 밖에 보관)로 서명했습니다. 소스에서 `./gradlew :app:assembleRelease`로 만들면 서명 안 된 APK가 나오므로, 직접 만든 release를 설치하려면 각자 키로 서명(`apksigner sign`)해야 합니다.
 
 ## 한계
 
@@ -110,3 +161,14 @@ python3 scripts/demo.py compare         # 3차: reset → gentle → dynamic →
 - **그래프는 주행거리로 추정한 속도입니다.** 앱이 받는 주행거리 간격(약 1초)마다 한 표본이라, 짧은 급정거는 그래프보다 사건 표시(▼)로 더 잘 보입니다. `seed`의 그래프 모양은 기록의 평균 시속·속도 변동으로 만든 시연 준비값입니다.
 - 앱이 운전 도중에 처음 켜지면 그 운전은 기록하지 않습니다.
 - 상시 포그라운드 서비스(`specialUse`)가 Pleos App Market 심사에서 허용되는지 확인하지 못했습니다.
+
+## 설계 문서
+
+- 설계 초안과 결정 기록: `docs/superpowers/specs/`. 설계 문서에는 개발 때 이름(DRIVE DNA, 나의 DNA)이 그대로 남아 있습니다.
+- 명세·계획·작업·검증: `specs/`(폴더마다 `spec.md`, `plan.md`, `tasks.md`, 구현 전 결정 `approval-gate.md`, 에뮬레이터 결과 `verification.md`)
+  - `001-drive-dna/`: 네 개 축과 16유형. `research.md`에 신호 측정, `contracts/ui.md`에 화면 문구가 있습니다
+  - `002-tags/`: 보조 태그 다섯 개
+  - `003-drive-graph/`: 운전 그래프, 두 운전 비교, 바뀐 태그 근거, 자막·공개 효과
+  - `004-car-screen/`: 차 화면 기준(글자 24sp, 누르는 칸 76dp, 대비 4.5:1)에 맞춘 개선
+  - `005-demo-pictures/`: 샘플 그래프를 기록마다 실제처럼, 점선 설명, 막대 끝 뜻
+- 화면 캡처: `docs/screenshots/`
